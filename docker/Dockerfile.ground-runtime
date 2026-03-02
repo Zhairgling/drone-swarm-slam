@@ -1,0 +1,36 @@
+# Ground station runtime image — ROS 2 Humble (arm64 for Apple Silicon)
+# Builds the ROS workspace from volume-mounted source at container start,
+# enabling edit-on-Mac / run-in-container development.
+#
+# Usage (via docker-compose.runtime.yml):
+#   docker compose -f docker/docker-compose.runtime.yml build
+#   docker compose -f docker/docker-compose.runtime.yml up
+
+FROM ros:humble-ros-base
+
+# Install build tools, foxglove bridge for web visualization, and rosdep
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        python3-colcon-common-extensions \
+        python3-rosdep \
+        ros-humble-foxglove-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep update --rosdistro=humble || true
+
+# DESIGN: Workspace root is /ws. Source arrives via volume mount at /ws/src.
+# Build artifacts live in named volumes (/ws/build, /ws/install) so they
+# persist across container restarts and incremental rebuilds are fast.
+WORKDIR /ws
+
+# DESIGN: colcon runs at container start (not image build) so that changes
+# made on the Mac host are picked up without rebuilding the image.
+# --symlink-install makes Python files effective immediately without rebuild.
+CMD ["bash", "-c", "\
+    source /opt/ros/humble/setup.bash && \
+    rosdep install --from-paths src --ignore-src -y || true && \
+    colcon build --symlink-install && \
+    source install/setup.bash && \
+    exec ros2 launch ground_station ground_station.launch.py \
+"]
