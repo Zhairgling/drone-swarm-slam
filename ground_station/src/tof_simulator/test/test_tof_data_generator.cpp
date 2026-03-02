@@ -1,3 +1,4 @@
+// cppcheck-suppress-file syntaxError
 #include "tof_simulator/tof_data_generator.hpp"
 
 #include <cmath>
@@ -101,10 +102,12 @@ TEST(RayBoxDistance, RayUpHitsCeiling) {
 
 TEST(RayBoxDistance, DiagonalRayHitsNearestWall) {
   Point3d origin = {2.5, 2.5, 1.5};
-  Point3d direction = {1.0, 1.0, 0.0};  // 45 degrees in XY
+  // Normalized unit vector at 45 degrees in XY plane
+  double s = 1.0 / std::sqrt(2.0);
+  Point3d direction = {s, s, 0.0};
   RoomConfig room = {5.0, 5.0, 3.0};
   double dist = TofDataGenerator::ray_box_distance(origin, direction, room, 10.0);
-  // At 45 degrees, hits corner at (5.0, 5.0): distance = 2.5 * sqrt(2)
+  // Hits corner (5,5) at Euclidean distance 2.5 * sqrt(2)
   EXPECT_NEAR(dist, 2.5 * std::sqrt(2.0), 1e-6);
 }
 
