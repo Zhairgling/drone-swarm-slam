@@ -306,9 +306,41 @@ if ${MAVPROXY_MISSING} && ! ${CHECK_ONLY}; then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. GitHub CLI (gh)
+# 5. esptool
 # ---------------------------------------------------------------------------
-log_section "5. GitHub CLI — gh (required — PR workflow)"
+# DESIGN: esptool must run natively on macOS — flash_firmware.sh needs direct
+# USB access to the XIAO ESP32S3, which is unavailable inside Docker containers.
+log_section "5. esptool (required — flash_firmware.sh)"
+
+ESPTOOL_MISSING=false
+if cmd_exists esptool.py; then
+    ESPTOOL_VER="$(esptool.py version 2>&1 | head -1 || true)"
+    log_ok "esptool" "${ESPTOOL_VER}"
+    STATUS_OK+=("esptool")
+else
+    log_missing "esptool"
+    STATUS_MISSING+=("esptool")
+    ESPTOOL_MISSING=true
+fi
+
+if ${ESPTOOL_MISSING} && ! ${CHECK_ONLY}; then
+    if ! cmd_exists python3; then
+        log_info "Python 3 is required to install esptool — skipping."
+        STATUS_SKIPPED+=("esptool")
+    else
+        echo ""
+        if confirm "Install esptool via pip3?"; then
+            pip_install "esptool" "esptool"
+        else
+            STATUS_SKIPPED+=("esptool")
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# 6. GitHub CLI (gh)
+# ---------------------------------------------------------------------------
+log_section "6. GitHub CLI — gh (required — PR workflow)"
 
 GH_MISSING=false
 if cmd_exists gh; then
@@ -331,9 +363,9 @@ if ${GH_MISSING} && ! ${CHECK_ONLY} && ! ${BREW_MISSING}; then
 fi
 
 # ---------------------------------------------------------------------------
-# 6. tmux
+# 7. tmux
 # ---------------------------------------------------------------------------
-log_section "6. tmux (required — ao agent sessions)"
+log_section "7. tmux (required — ao agent sessions)"
 
 TMUX_MISSING=false
 if cmd_exists tmux; then
@@ -356,9 +388,9 @@ if ${TMUX_MISSING} && ! ${CHECK_ONLY} && ! ${BREW_MISSING}; then
 fi
 
 # ---------------------------------------------------------------------------
-# 7. Foxglove Studio
+# 8. Foxglove Studio
 # ---------------------------------------------------------------------------
-log_section "7. Foxglove Studio (required — visualization)"
+log_section "8. Foxglove Studio (required — visualization)"
 
 FOXGLOVE_MISSING=false
 # DESIGN: Foxglove is a .app bundle, not a CLI — check /Applications directly.
@@ -386,9 +418,9 @@ if ${FOXGLOVE_MISSING} && ! ${CHECK_ONLY} && ! ${BREW_MISSING}; then
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Optional tools (shown always, installed only with --all)
+# 9. Optional tools (shown always, installed only with --all)
 # ---------------------------------------------------------------------------
-log_section "8. Optional: ESP-IDF native prerequisites"
+log_section "9. Optional: ESP-IDF native prerequisites"
 printf "   ${YELLOW}(install with --all for native firmware dev outside Docker)${RESET}\n\n"
 
 CMAKE_MISSING=false
@@ -417,7 +449,7 @@ elif (${CMAKE_MISSING} || ${NINJA_MISSING}) && ! ${INSTALL_ALL} && ! ${CHECK_ONL
     log_info "Run with --all to install optional ESP-IDF native prerequisites."
 fi
 
-log_section "9. Optional: colcon (ROS 2 native dev)"
+log_section "10. Optional: colcon (ROS 2 native dev)"
 printf "   ${YELLOW}(install with --all for native ROS 2 build outside Docker)${RESET}\n\n"
 
 COLCON_MISSING=false
