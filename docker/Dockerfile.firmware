@@ -1,0 +1,14 @@
+# Firmware CI build — ESP-IDF for ESP32S3
+# Usage: docker compose -f docker/docker-compose.yml run firmware-build
+
+FROM espressif/idf:v5.2.1
+
+WORKDIR /project
+
+# Copy source to writable build dir, configure target, and build
+CMD ["bash", "-c", "\
+    cp -r /project/firmware /build && \
+    cd /build && \
+    idf.py set-target esp32s3 && \
+    idf.py build \
+"]
