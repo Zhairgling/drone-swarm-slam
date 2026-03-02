@@ -160,7 +160,6 @@ esp_err_t mavlink_bridge_init(void)
 
 esp_err_t mavlink_bridge_create(rcl_node_t *node, rclc_executor_t *executor)
 {
-    rcl_allocator_t alloc = rcl_get_default_allocator();
     const rosidl_message_type_support_t *type =
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt8MultiArray);
 
