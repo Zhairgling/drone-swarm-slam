@@ -1,0 +1,17 @@
+---
+# Checks for ground_station/ C++17 / ROS 2 code (Google style).
+# Keep this conservative so existing code passes without suppressions.
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-exception-escape
+
+WarningsAsErrors: '*'
+
+# Only report issues in our own headers; ignore ROS 2 / system headers.
+HeaderFilterRegex: '^.*(ground_station|msgs)/.*\.(h|hpp)$'
+
+FormatStyle: google
