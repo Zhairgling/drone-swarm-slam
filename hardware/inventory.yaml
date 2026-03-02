@@ -20,9 +20,30 @@ drones:
 
     flight_controller:
       model: "Matek H743-MINI V3"
-      mcu: "STM32H743"
+      mcu: "STM32H743VIT6"
       firmware: "ArduCopter"
-      notes: "5V BEC output at 1.5A continuous used to power companion"
+      dimensions_mm: "36×28×6.5"
+      weight_g: 7
+      mounting: "20×20mm, Φ4mm holes"
+      power_input:
+        pad: "Vbat"
+        range: "6.3–36V DC (2–8S LiPo)"
+        connector: "JST-SH-8P (Vbat/G/Curr/Rx8/S1–S4)"
+      power_rails:
+        5V_bec: "1.5A continuous"
+        8V_bec: "1.5A continuous"
+        4V5: "4.4–4.8V, 500mA max (also live when powered via USB)"
+        3V3: "LDO 200mA (usable output pad)"
+      onboard_chips:
+        imu_primary: "MPU-6000"
+        imu_secondary: "ICM-20602"
+        barometer: "DPS310 (I2C2 internal bus — no DA2/CL2 breakout)"
+        osd: "AT7456E"
+        blackbox: "MicroSD socket"
+      can_bus:
+        pads: ["C-H (CAN High)", "C-L (CAN Low)"]
+        notes: "Not used in this project; available for future peripherals"
+      notes: "5V BEC 1.5A powers companion; 8V BEC available for VTx or peripherals"
       # SERIAL numbers ≠ UART numbers on H743-MINI V3; see hwdef.dat SERIAL_ORDER.
       serial_ports:
         - port: SERIAL0
@@ -42,7 +63,13 @@ drones:
             RNGFND1_TYPE: 10      # MAVLink rangefinder
             RNGFND1_MAX_CM: 800
             RNGFND1_MIN_CM: 5
-          notes: "MicoAir MTF-02P wired to TX7/RX7. Lidar range arrives on same UART."
+          extra_pins:
+            cts: CTs7   # UART7 hardware flow control (Telem1 port — not needed for MTF-02P)
+            rts: Rts7
+          notes: >
+            MicoAir MTF-02P wired to TX7/RX7. Lidar range arrives on same UART.
+            UART7 is the board's Telem1 port with CTS/RTS; flow control not
+            required for MTF-02P at 115200 baud.
         - port: SERIAL2
           hw_uart: USART1
           protocol: "GPS (NMEA / UBX)"
@@ -63,15 +90,16 @@ drones:
           notes: "Reserved for future use (e.g., telemetry radio)"
         - port: SERIAL4
           hw_uart: USART3
-          protocol: "available"
-          wiring:
-            fc_tx: TX3
-            fc_rx: RX3
-          notes: "Reserved for future use"
+          protocol: "NOT AVAILABLE"
+          notes: >
+            USART3 is defined in hwdef.dat but its pins are NOT broken out on
+            the H743-MINI V3 PCB. Do not use. (Board exposes: UART1,2,4,6,7,RX8)
         - port: SERIAL5
           hw_uart: UART8
-          protocol: "available"
-          notes: "Reserved for future use"
+          protocol: "available (RX-only)"
+          wiring:
+            fc_rx: RX8   # PE0 — receive only, no TX pin
+          notes: "UART8_RX only — no Tx8 breakout (confirmed on Matek back-panel diagram). Suitable for one-way input sensors."
         - port: SERIAL6
           hw_uart: UART4
           protocol: "MAVLink 2 (companion computer)"
@@ -88,13 +116,16 @@ drones:
           protocol: "CRSF (ELRS RC)"
           baud: 420000
           wiring:
-            fc_rx: RX6   # RX-only UART — sufficient for CRSF input
+            fc_rx: RX6   # CH1 — RC input from ELRS receiver
+            fc_tx: TX6   # CH2 — telemetry/commands to receiver (bidirectional CRSF)
           ardupilot_params:
             SERIAL7_PROTOCOL: 23  # RCIN
-            SERIAL7_BAUD: 115     # ArduPilot auto-negotiates CRSF; 115200 fallback
+            BRD_ALT_CONFIG: 1     # Switches USART6 from RC-only to true UART for CRSF
           notes: >
-            USART6 exposes RX6 only on H743-MINI V3. CRSF (ELRS) requires only
-            the RX line for RC input — one-wire is sufficient.
+            USART6 defaults to RC-only mode (SBUS/IBUS/DSM/PPM on RX6 only).
+            BRD_ALT_CONFIG=1 enables full bidirectional UART; both TX6 and RX6
+            are broken out on the board bottom edge (confirmed by official wiring
+            diagram: CRSF uses Rx6=CH1, Tx6=CH2).
 
     companion:
       model: "Seeed XIAO ESP32S3 Sense"
@@ -174,7 +205,13 @@ drones:
         fc_tx: TX1
         fc_rx: RX1
       compass_interface: "I2C1 (H743 onboard)"
-      notes: "Combo GPS+compass module. Connect UART to TX1/RX1, compass to FC I2C1."
+      compass_wiring:
+        sda: DA1   # I2C1 SDA pad on board bottom edge
+        scl: CL1   # I2C1 SCL pad on board bottom edge
+      notes: >
+        Combo GPS+compass module. UART to TX1/RX1 (SERIAL2). Compass QMC5883L
+        to DA1/CL1 (I2C1). DA1 & CL1 also support digital airspeed sensors.
+        Onboard DPS310 barometer is on I2C2 (internal) — no conflict.
 
     motors:
       model: "Nin V2 1404 2750kv"
@@ -207,12 +244,15 @@ drones:
       uart_port: "SERIAL7 (USART6)"
       link_type: "CRSF"
       wiring:
-        fc_rx: RX6   # RX-only — CRSF input only needs one wire
+        fc_rx: RX6   # RC input
+        fc_tx: TX6   # optional — ELRS telemetry passthrough (requires BRD_ALT_CONFIG=1)
       ardupilot_params:
         SERIAL7_PROTOCOL: 23   # RCIN
+        BRD_ALT_CONFIG: 1      # Enables full UART on USART6 (required for CRSF)
       notes: >
-        USART6 on H743-MINI V3 exposes RX6 only. CRSF (ELRS) is a
-        half-duplex protocol where the FC only needs the RX line for input.
+        USART6 is RC-input mode by default. BRD_ALT_CONFIG=1 must be set to
+        enable CRSF bidirectional UART. RC input on RX6; TX6 optional for
+        ELRS telemetry passthrough to the receiver.
 
     optical_flow_lidar:
       model: "MicoAir MTF-02P"
