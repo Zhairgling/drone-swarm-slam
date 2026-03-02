@@ -1,0 +1,100 @@
+# common.param — Shared ArduCopter parameters for all swarm drones
+# Hardware: Matek H743-MINI V3, M100QMC-5883L GPS/compass, ELRS RC
+# Frame: Flywoo Explorer LR 4 (4"), 4S 14.8V
+#
+# Format: NAME VALUE   (ArduPilot param file format)
+# Import: Mission Planner → Config → Full Parameter List → Load from file
+#         MAVProxy: param load common.param
+#
+# Non-obvious parameters are annotated with their rationale.
+
+# ---------------------------------------------------------------------------
+# EKF3 — Extended Kalman Filter (3rd generation)
+# ---------------------------------------------------------------------------
+AHRS_EKF_TYPE 3        # Use EKF3 (required for dual GPS, better for SLAM)
+EK3_ENABLE 1           # Enable EKF3
+EK2_ENABLE 0           # Disable EKF2 (avoid ambiguity)
+
+# EKF3 source selection: GPS primary, compass heading
+EK3_SRC1_POSXY 3       # GPS for horizontal position
+EK3_SRC1_VELXY 3       # GPS for horizontal velocity
+EK3_SRC1_POSZ 1        # Barometer for vertical position
+EK3_SRC1_VELZ 0        # No vertical velocity source
+EK3_SRC1_YAW 1         # Compass for yaw
+
+# ---------------------------------------------------------------------------
+# GPS — M100QMC-5883L (GPS + QMC5883L external compass)
+# ---------------------------------------------------------------------------
+GPS_TYPE 1             # AUTO-detect (detects UBLOX/NMEA)
+GPS_TYPE2 0            # No second GPS
+GPS_AUTO_SWITCH 1      # Auto-switch to best GPS
+GPS_GNSS_MODE 0        # Use all constellations (0 = auto)
+
+# ---------------------------------------------------------------------------
+# Compass — QMC5883L on M100QMC-5883L module (external, I2C)
+# ---------------------------------------------------------------------------
+COMPASS_USE 1          # Use compass #1 (internal — may not be fitted on H743)
+COMPASS_USE2 1         # Use compass #2 (external QMC5883L on GPS module)
+COMPASS_USE3 0         # No third compass
+# DESIGN: External compass is #2. Prioritize external (further from ESC noise).
+COMPASS_PRIO1_ID 2     # First priority: external compass on GPS module
+COMPASS_PRIO2_ID 1     # Second priority: internal (if present)
+COMPASS_AUTODEC 1      # Auto magnetic declination from GPS position
+
+# Compass health thresholds (tighten for indoor/SLAM accuracy)
+COMPASS_OFFS_MAX 850   # Default 850 — raise if calibration fails
+
+# ---------------------------------------------------------------------------
+# Failsafe — RC (ELRS) and battery (4S 3000mAh Sony VTC6)
+# ---------------------------------------------------------------------------
+
+# RC / Throttle failsafe
+FS_THR_ENABLE 1        # Enable throttle failsafe (1 = RTL, 2 = Continue, 3 = Land)
+FS_THR_VALUE 975       # PWM below this triggers FS (ELRS typically outputs ~885 on signal loss)
+
+# GCS (heartbeat) failsafe — relevant when running autonomous missions
+FS_GCS_ENABLE 1        # Enable GCS failsafe (1 = Land if no heartbeat)
+
+# Battery failsafe — 4S: 4.2V full, 3.7V nominal, 3.5V low, 3.3V critical
+BATT_MONITOR 4         # Voltage + current monitor
+BATT_LOW_VOLT 14.2     # Low: 3.55V × 4 cells → RTL
+BATT_CRT_VOLT 13.6     # Critical: 3.4V × 4 cells → Land
+BATT_FS_LOW_ACT 2      # Low battery action: 2 = RTL
+BATT_FS_CRT_ACT 1      # Critical battery action: 1 = Land
+
+# DESIGN: Using cell-voltage math for 4S (not per-cell params) for simplicity.
+# Operator should calibrate BATT_VOLT_MULT and BATT_AMP_PERVLT after first flight.
+
+# ---------------------------------------------------------------------------
+# Flight modes — autonomous-biased layout for swarm missions
+# ---------------------------------------------------------------------------
+# Switch positions map to RC channel 5 (6-position switch or 3-pos × 2 mix)
+FLTMODE1 0             # Stabilize     — manual fallback / recovery
+FLTMODE2 2             # AltHold       — manual with altitude hold
+FLTMODE3 5             # Loiter        — position hold (GPS)
+FLTMODE4 6             # RTL           — return to launch
+FLTMODE5 3             # Auto          — execute autonomous mission
+FLTMODE6 4             # Guided        — external control (SLAM / ground station)
+FLTMODE_CH 5           # Flight mode channel (ELRS default aux1 = ch5)
+
+# ---------------------------------------------------------------------------
+# ArduCopter general
+# ---------------------------------------------------------------------------
+FRAME_TYPE 1           # X frame
+FRAME_CLASS 1          # Quad
+
+# Arming checks — keep strict for safety
+ARMING_CHECK 1         # All checks enabled
+
+# Motor output protocol (DSHOT600 for Nin V2 1404 2750kv)
+MOT_PWM_TYPE 6         # DSHOT600
+
+# ESC telemetry (if ESCs support it — enables RPM/temperature feedback)
+RPM_TYPE 2             # DSHOT ESC telemetry on motor outputs
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+LOG_BITMASK 176126     # Default comprehensive logging
+LOG_DISARMED 0         # Don't log when disarmed (saves flash)
+LOG_REPLAY 0           # Disable EKF replay logging (saves space)
