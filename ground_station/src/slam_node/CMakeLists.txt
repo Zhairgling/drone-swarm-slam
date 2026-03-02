@@ -9,10 +9,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_sensor_msgs REQUIRED)
 
 # Library: occupancy map logic (reusable, testable without ROS node)
 add_library(occupancy_map
@@ -39,10 +43,14 @@ target_include_directories(slam_node_exec PUBLIC
 )
 target_link_libraries(slam_node_exec occupancy_map)
 ament_target_dependencies(slam_node_exec
+  geometry_msgs
   nav_msgs
   rclcpp
   sensor_msgs
   std_msgs
+  tf2
+  tf2_ros
+  tf2_sensor_msgs
 )
 set_target_properties(slam_node_exec PROPERTIES OUTPUT_NAME slam_node)
 

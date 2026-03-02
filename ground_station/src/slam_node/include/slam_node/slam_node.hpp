@@ -7,6 +7,8 @@
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include "slam_node/occupancy_map.hpp"
 
@@ -18,9 +20,9 @@ namespace slam_node {
 /// Publishes /slam/map (nav_msgs/OccupancyGrid) at a configurable rate.
 /// Publishes /slam/map_3d (sensor_msgs/PointCloud2) alongside the 2D map.
 ///
-/// DESIGN: No TF2 transforms applied. Assumes incoming pointclouds are
-/// expressed in a common map-relative frame. This matches the simulator
-/// output and is sufficient until a pose estimator (issue #10) is added.
+/// Incoming pointclouds are transformed to the map frame via TF2 before
+/// insertion. Clouds with unavailable transforms are skipped to avoid
+/// accumulating data in wrong frames.
 class SlamNode : public rclcpp::Node {
  public:
   explicit SlamNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
@@ -36,6 +38,8 @@ class SlamNode : public rclcpp::Node {
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_3d_pub_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
   std::string map_frame_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };
 
 }  // namespace slam_node
