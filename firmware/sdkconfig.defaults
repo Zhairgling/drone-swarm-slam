@@ -1,20 +1,87 @@
-# ESP32-S3 XIAO defaults
+# sdkconfig.defaults — XIAO ESP32S3 Sense project defaults
+# ============================================================
+# *** BEFORE FIRST BUILD: change the two CHANGE_ME fields below. ***
+# All other values match hardware/inventory.yaml and docs/hardware_wiring.md.
+#
+# Apply:
+#   idf.py set-target esp32s3
+#   idf.py build
 
-# Flash (XIAO ESP32S3 Sense has 8MB flash)
+# ------------------------------------------------------------
+# WiFi credentials — CHANGE_ME before first build
+# ------------------------------------------------------------
+CONFIG_MICRO_ROS_WIFI_SSID="CHANGE_ME_SSID"
+CONFIG_MICRO_ROS_WIFI_PASS="CHANGE_ME_PASSWORD"
+
+# ------------------------------------------------------------
+# micro-ROS — UDP transport to ground station agent
+# DESIGN: UDP best-effort matches sensor QoS; reliable not needed here.
+#         Agent IP must match the machine running `ros2 run micro_ros_agent`.
+# ------------------------------------------------------------
+CONFIG_MICRO_ROS_AGENT_IP="CHANGE_ME_AGENT_IP"
+CONFIG_MICRO_ROS_AGENT_PORT=8888
+
+# ------------------------------------------------------------
+# Drone ID — unique per vehicle (1–255)
+# ------------------------------------------------------------
+CONFIG_DRONE_ID=1
+
+# ------------------------------------------------------------
+# Flash — 8 MB QIO (XIAO ESP32S3 Sense hardware)
+# ------------------------------------------------------------
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 
-# PSRAM (XIAO ESP32S3 Sense has 8MB OPI PSRAM)
+# ------------------------------------------------------------
+# PSRAM — 8 MB Octal SPI (OPI)
+# ------------------------------------------------------------
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 
-# FreeRTOS — dual-core
+# ------------------------------------------------------------
+# FreeRTOS — 1000 Hz tick rate required by micro-ROS timers
+# DESIGN: micro-ROS timer queue needs 1 ms tick resolution.
+#         Lower rates (100 Hz default) cause jitter in 15 Hz ToF publish.
+# ------------------------------------------------------------
+CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
 
 # Main task stack (micro-ROS needs headroom)
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
-# WiFi buffers for reliable UDP streaming
+# ------------------------------------------------------------
+# ToF sensors (4× VL53L8CX) — hardware/inventory.yaml GPIO assignments
+# ------------------------------------------------------------
+CONFIG_TOF_SENSOR_COUNT=4
+CONFIG_TOF_I2C_SDA_GPIO=6
+CONFIG_TOF_I2C_SCL_GPIO=7
+CONFIG_TOF_I2C_FREQ_HZ=1000000
+CONFIG_TOF_LPN_GPIO_0=2
+CONFIG_TOF_LPN_GPIO_1=3
+CONFIG_TOF_LPN_GPIO_2=4
+CONFIG_TOF_LPN_GPIO_3=5
+CONFIG_TOF_RANGING_FREQ_HZ=15
+
+# ------------------------------------------------------------
+# Camera (OV2640) — QVGA JPEG, supplementary telemetry only
+# ------------------------------------------------------------
+CONFIG_OV2640_FRAME_SIZE_QVGA=y
+CONFIG_OV2640_JPEG_QUALITY=12
+CONFIG_OV2640_FB_COUNT=2
+
+# ------------------------------------------------------------
+# MAVLink bridge — UART1, GPIO21/20, 921600 baud
+# Matches H743-MINI V3 SERIAL6 (UART4) assignment in inventory.yaml.
+# ------------------------------------------------------------
+CONFIG_MAVLINK_UART_NUM=1
+CONFIG_MAVLINK_UART_TX_PIN=21
+CONFIG_MAVLINK_UART_RX_PIN=20
+CONFIG_MAVLINK_UART_BAUD=921600
+
+# ------------------------------------------------------------
+# WiFi buffers — reliable UDP streaming for micro-ROS
+# ------------------------------------------------------------
 CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=64
@@ -23,9 +90,13 @@ CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=64
 CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_LWIP_SO_RCVBUF=y
 
-# Custom partition table (larger app partition for micro-ROS)
+# ------------------------------------------------------------
+# Partition table — larger app partition for micro-ROS binary
+# ------------------------------------------------------------
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 
+# ------------------------------------------------------------
 # Compiler
+# ------------------------------------------------------------
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
