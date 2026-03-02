@@ -34,8 +34,8 @@ PointcloudAssemblerNode::PointcloudAssemblerNode(
         "/drone_" + std::to_string(id) + "/tof/pointcloud";
     auto sub = create_subscription<sensor_msgs::msg::PointCloud2>(
         topic, qos_in,
-        [this](const sensor_msgs::msg::PointCloud2::SharedPtr& msg) {
-          on_pointcloud(msg);
+        [this](sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+          on_pointcloud(std::move(msg));
         });
     subscriptions_.push_back(sub);
     RCLCPP_INFO(get_logger(), "Subscribing to %s", topic.c_str());
@@ -62,7 +62,7 @@ PointcloudAssemblerNode::PointcloudAssemblerNode(
 }
 
 void PointcloudAssemblerNode::on_pointcloud(
-    const sensor_msgs::msg::PointCloud2::SharedPtr& msg) {
+    sensor_msgs::msg::PointCloud2::SharedPtr msg) {
   assembler_->add_cloud(*msg);
 }
 

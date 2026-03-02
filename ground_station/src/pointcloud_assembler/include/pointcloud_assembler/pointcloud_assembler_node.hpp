@@ -27,7 +27,7 @@ class PointcloudAssemblerNode : public rclcpp::Node {
       const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
  private:
-  void on_pointcloud(const sensor_msgs::msg::PointCloud2::SharedPtr& msg);
+  void on_pointcloud(sensor_msgs::msg::PointCloud2::SharedPtr msg);
   void publish_timer_callback();
 
   std::unique_ptr<PointcloudAssembler> assembler_;

@@ -44,7 +44,7 @@ PoseEstimatorNode::PoseEstimatorNode(const rclcpp::NodeOptions& options)
 }
 
 void PoseEstimatorNode::pose_callback(
-    const geometry_msgs::msg::PoseStamped::SharedPtr& msg) {
+    geometry_msgs::msg::PoseStamped::SharedPtr msg) {
   auto mavlink_msg =
       encode_vision_position_estimate(*msg, seq_++, sysid_, compid_);
   pub_->publish(mavlink_msg);
