@@ -71,20 +71,37 @@ macOS Ground Station (ROS 2 Humble, C++)
 - One issue = one PR. CI must pass.
 - Rebase onto main before merge.
 
-## Build
+## Build & Test
+
+Development runs on macOS (no native ROS 2 / ESP-IDF). **Always use Docker to
+build and test locally before pushing.**
+
+```bash
+# Test ground station (ROS 2 Humble — build + colcon test)
+docker compose -f docker/docker-compose.yml run ground-build
+
+# Test firmware (ESP-IDF — build + unit tests)
+docker compose -f docker/docker-compose.yml run firmware-build
+
+# Run both
+docker compose -f docker/docker-compose.yml run ground-build && \
+docker compose -f docker/docker-compose.yml run firmware-build
+```
+
+If Docker is not available, push and let GitHub Actions CI run — but prefer
+local Docker testing to catch issues early.
+
+### Native (only if ROS 2 / ESP-IDF installed locally)
 ```bash
 # Firmware
 cd firmware && idf.py set-target esp32s3 && idf.py build
 # Ground
 source /opt/ros/humble/setup.bash && colcon build && colcon test
-# Docker CI
-docker compose -f docker/docker-compose.yml run firmware-build
-docker compose -f docker/docker-compose.yml run ground-build
 ```
 
 ## Agent Rules
 1. Read this file first. Follow all conventions.
-2. Run tests before committing.
+2. **Run tests via Docker before pushing.** Use `docker compose -f docker/docker-compose.yml run ground-build` for ground station and `docker compose -f docker/docker-compose.yml run firmware-build` for firmware. If Docker is unavailable, push and monitor CI.
 3. Keep firmware MINIMAL. 512KB SRAM + 512KB PSRAM.
 4. Simplest working implementation first.
 5. Non-obvious decisions → `// DESIGN:` comment.

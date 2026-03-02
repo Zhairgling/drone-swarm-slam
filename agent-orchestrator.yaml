@@ -1,0 +1,71 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3000
+
+defaults:
+  runtime: tmux
+  agent: claude-code
+  workspace: worktree
+  notifiers:
+    - desktop
+
+projects:
+  drone-swarm-slam:
+    name: Drone Swarm SLAM
+    sessionPrefix: dss
+    repo: Zhairgling/drone-swarm-slam
+    path: /Users/julienc/Documents/GitHub/drone-swarm-slam
+    defaultBranch: main
+
+    symlinks: [.claude, .env]
+
+    postCreate:
+      - "docker compose -f docker/docker-compose.yml build 2>/dev/null || true"
+
+    agentRulesFile: CLAUDE.md
+    agentRules: |-
+      One component per PR. Never mix firmware + ground station code.
+      Keep firmware MINIMAL — 512KB SRAM + 512KB PSRAM budget.
+      Simplest working implementation first. No over-engineering.
+      ALWAYS test before pushing using Docker:
+        - Ground station: docker compose -f docker/docker-compose.yml run ground-build
+        - Firmware: docker compose -f docker/docker-compose.yml run firmware-build
+      If Docker test fails, fix the issue before pushing.
+      Use conventional commits: feat(firmware):, fix(ground):, etc.
+      Link issue numbers in commit messages.
+
+    # Sonnet 4.6 par défaut pour économiser les quotas.
+    # Pour les tâches complexes, override manuellement avec /model opus dans le tmux.
+    agentConfig:
+      model: claude-sonnet-4-6
+      permissions: skip
+
+    orchestratorRules: |-
+      Si une issue touche firmware ET ground, la split en deux issues séparées avant de spawner.
+      Prioriser : bugs CI > firmware > ground > docs.
+      Si un worker est stuck >10min, envoyer des instructions précises plutôt que le laisser boucler.
+
+reactions:
+  ci-failed:
+    auto: true
+    action: send-to-agent
+    retries: 2
+    escalateAfter: 2
+  changes-requested:
+    auto: true
+    action: send-to-agent
+    escalateAfter: 30m
+  approved-and-green:
+    auto: false
+    action: notify
+    priority: action
+  agent-stuck:
+    threshold: 10m
+    action: notify
+    priority: urgent
+
+notificationRouting:
+  urgent: [desktop]
+  action: [desktop]
+  warning: [desktop]
+  info: [desktop]
