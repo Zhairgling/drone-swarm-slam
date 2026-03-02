@@ -1,0 +1,70 @@
+menu "ToF Sensor (VL53L8CX)"
+
+    config TOF_SENSOR_COUNT
+        int "Number of VL53L8CX sensors"
+        default 4
+        range 1 4
+        help
+            Number of VL53L8CX sensors on the shared I2C bus.
+            Each sensor needs a unique LPn GPIO for address assignment.
+
+    config TOF_I2C_SDA_GPIO
+        int "I2C SDA GPIO"
+        default 6
+        help
+            GPIO used for I2C data line (shared by all sensors).
+
+    config TOF_I2C_SCL_GPIO
+        int "I2C SCL GPIO"
+        default 7
+        help
+            GPIO used for I2C clock line (shared by all sensors).
+
+    config TOF_I2C_FREQ_HZ
+        int "I2C clock frequency (Hz)"
+        default 1000000
+        help
+            I2C bus speed. VL53L8CX supports up to 1 MHz (Fast Mode Plus).
+            Reduce to 400000 if the bus is unstable with long wires.
+
+    config TOF_LPN_GPIO_0
+        int "LPn GPIO for sensor #0 (front)"
+        default 2
+        help
+            Low-Power enable pin for sensor 0. Directly controls
+            sensor power-up during the address assignment sequence.
+
+    config TOF_LPN_GPIO_1
+        int "LPn GPIO for sensor #1 (right)"
+        default 3
+
+    config TOF_LPN_GPIO_2
+        int "LPn GPIO for sensor #2 (back)"
+        default 4
+
+    config TOF_LPN_GPIO_3
+        int "LPn GPIO for sensor #3 (left)"
+        default 5
+
+    config TOF_RANGING_FREQ_HZ
+        int "Ranging frequency (Hz)"
+        default 15
+        range 1 60
+        help
+            Sensor measurement rate. 15 Hz matches the micro-ROS
+            publishing timer (66 ms period).
+
+    config TOF_POLL_TASK_STACK
+        int "Polling task stack size (bytes)"
+        default 4096
+        help
+            Stack size for the FreeRTOS task that polls all sensors.
+
+    config TOF_POLL_TASK_PRIORITY
+        int "Polling task priority"
+        default 5
+        range 1 24
+        help
+            FreeRTOS priority for the sensor polling task.
+
+endmenu
