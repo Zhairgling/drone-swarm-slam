@@ -62,6 +62,21 @@ if(BUILD_TESTING)
     sensor_msgs
     std_msgs
   )
+
+  # Node-level integration test: verifies publish behaviour end-to-end.
+  ament_add_gtest(test_tof_simulator_node
+    test/test_tof_simulator_node.cpp
+    src/tof_simulator_node.cpp
+  )
+  target_link_libraries(test_tof_simulator_node tof_data_generator)
+  target_include_directories(test_tof_simulator_node PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  )
+  ament_target_dependencies(test_tof_simulator_node
+    rclcpp
+    sensor_msgs
+    std_msgs
+  )
 endif()
 
 ament_package()

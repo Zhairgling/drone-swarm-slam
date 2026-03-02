@@ -3,7 +3,8 @@
 
 FROM ros:humble-ros-base
 
-# Install build tools and linters required by project conventions
+# Install build tools, linters, and ground-station ROS dependencies.
+# ros-humble-mavros-msgs is needed by drone_swarm_pose_estimator.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
@@ -11,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         cppcheck \
         python3-colcon-common-extensions \
         python3-rosdep \
+        ros-humble-mavros-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Ensure rosdep is initialized
@@ -18,12 +20,23 @@ RUN rosdep update --rosdistro=humble || true
 
 WORKDIR /project
 
-# Copy source to writable build dir, install deps, build, and test
+# Build and test all ground-station packages.
+#
+# DESIGN: colcon stops crawling into a directory once it finds a package, so
+# a flat workspace layout is required.  We copy the meta-package and each
+# sub-package into a top-level src/ workspace so colcon discovers them all.
+# The nested src/ tree inside the meta-package copy is removed to avoid any
+# risk of double-discovery.
 CMD ["bash", "-c", "\
-    cp -r /project/ground_station /build && \
-    cd /build && \
+    mkdir -p /ws/src && \
+    cp -r /project/ground_station /ws/src/drone_swarm_ground_station && \
+    for d in /ws/src/drone_swarm_ground_station/src/*/; do \
+        cp -r \"$d\" /ws/src/; \
+    done && \
+    rm -rf /ws/src/drone_swarm_ground_station/src && \
+    cd /ws && \
     source /opt/ros/humble/setup.bash && \
-    rosdep install --from-paths . --ignore-src -y || true && \
+    rosdep install --from-paths src --ignore-src -y || true && \
     colcon build --symlink-install && \
     colcon test && \
     colcon test-result --verbose \

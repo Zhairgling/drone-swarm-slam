@@ -91,6 +91,10 @@ esp_err_t ov2640_init(void)
 
 esp_err_t ov2640_capture(ov2640_frame_t *frame)
 {
+    if (frame == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     if (s_current_fb != NULL) {
         ESP_LOGW(TAG, "previous frame not released, releasing now");
         esp_camera_fb_return(s_current_fb);

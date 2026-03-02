@@ -24,9 +24,8 @@ install(DIRECTORY config/
 )
 
 if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_ground_station test/test_ground_station.cpp)
-  ament_target_dependencies(test_ground_station rclcpp)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_launch_file test/test_launch_file.py)
 endif()
 
 ament_package()
