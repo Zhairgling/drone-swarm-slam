@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
+#include "tof_sensor.h"
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
@@ -185,6 +186,10 @@ void app_main(void)
 
     /* Initialize OV2640 camera before starting micro-ROS task */
     ESP_ERROR_CHECK(ov2640_init());
+
+    /* Initialise ToF sensors (I2C bus + LPn sequencing + firmware load) */
+    ESP_ERROR_CHECK(tof_sensor_init());
+    ESP_ERROR_CHECK(tof_sensor_start());
 
     /* DESIGN: 24KB stack for micro-ROS task; increased from 16KB to
        accommodate camera publisher and JPEG buffer operations. */
