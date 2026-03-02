@@ -1,0 +1,182 @@
+name: Lint (Ground Station)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ground_station/**.cpp'
+      - 'ground_station/**.hpp'
+      - 'msgs/**'
+      - '.github/workflows/lint-ground.yml'
+      - '.clang-tidy'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ground_station/**.cpp'
+      - 'ground_station/**.hpp'
+      - 'msgs/**'
+      - '.github/workflows/lint-ground.yml'
+      - '.clang-tidy'
+  workflow_dispatch:
+
+concurrency:
+  group: lint-ground-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clang-tidy:
+    name: clang-tidy (Ground Station)
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for C++ source files
+        id: check
+        run: |
+          if ! find ground_station -name '*.cpp' -o -name '*.hpp' 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No C++ files in ground_station/ — skipping clang-tidy"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq clang-tidy python3-colcon-common-extensions > /dev/null
+          source /opt/ros/humble/setup.bash
+          rosdep update --rosdistro=humble
+          rosdep install --from-paths ground_station msgs \
+            --ignore-src -y --rosdistro=humble 2>/dev/null || true
+
+      - name: Build with compile commands
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          # DESIGN: Allow build failure (|| true) so that packages that fail due to
+          # missing optional deps don't block linting of packages that did build.
+          # Files without compile DB entries are skipped in the next step.
+          colcon build --packages-up-to-regex 'drone_swarm_.*' \
+            --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || true
+
+      - name: Run clang-tidy (files in compile DB only)
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import json, glob, os, pathlib, subprocess, sys
+
+          # Merge all compile_commands.json entries from the build tree
+          commands = []
+          for f in glob.glob('build/**/compile_commands.json', recursive=True):
+              commands.extend(json.loads(pathlib.Path(f).read_text()))
+
+          if not commands:
+              print("::warning::No compile_commands.json entries found — "
+                    "build may have failed. Skipping clang-tidy.")
+              sys.exit(0)
+
+          pathlib.Path('compile_commands.json').write_text(json.dumps(commands))
+
+          # Resolve each entry's file to an absolute path
+          # (entries may use relative paths anchored at entry['directory'])
+          cwd = os.getcwd()
+          files_in_db = set()
+          for entry in commands:
+              f = entry['file']
+              if not os.path.isabs(f):
+                  f = os.path.join(entry.get('directory', cwd), f)
+              files_in_db.add(os.path.realpath(f))
+
+          # Collect .cpp files from ground_station that have compile DB entries
+          tidy_files = []
+          for root, dirs, files in os.walk('ground_station'):
+              for fname in files:
+                  if fname.endswith('.cpp'):
+                      fpath = os.path.realpath(os.path.join(root, fname))
+                      if fpath in files_in_db:
+                          tidy_files.append(fpath)
+                      else:
+                          print(f"::warning::Skipping {fpath} — "
+                                "not in compile DB (package may not have built)")
+
+          if not tidy_files:
+              print("::notice::No ground_station .cpp files in compile DB — "
+                    "skipping clang-tidy")
+              sys.exit(0)
+
+          print(f"Running clang-tidy on {len(tidy_files)} file(s)...")
+          result = subprocess.run(
+              ['clang-tidy', '-p', '.', '--warnings-as-errors=*'] + tidy_files,
+              check=False)
+          sys.exit(result.returncode)
+          EOF
+
+      - name: Lint summary
+        if: steps.check.outputs.skip != 'true'
+        run: echo "::notice::Ground station clang-tidy passed"
+
+  cppcheck-ground:
+    name: cppcheck (Ground Station / C++17)
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for C++ source files
+        id: check
+        run: |
+          if ! find ground_station -name '*.cpp' -o -name '*.hpp' 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::No C++ files in ground_station/ — skipping cppcheck"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install cppcheck
+        if: steps.check.outputs.skip != 'true'
+        run: apt-get update -qq && apt-get install -y -qq cppcheck
+
+      - name: Run cppcheck on ground_station (C++17)
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          # DESIGN: Running in ros:humble gives us /opt/ros/humble/include for installed
+          # ROS 2 package headers. missingIncludeSystem suppresses angle-bracket includes
+          # that cppcheck cannot resolve (e.g. auto-generated msg headers not on disk).
+          #
+          # DESIGN: Exclude */test/* directories. GTest macros (TEST(), EXPECT_*()) produce
+          # cppcheck syntaxError when gtest.h is unavailable — the error fires during
+          # parsing, before inline suppression directives are processed. Test code is
+          # already validated by the GTest runner via colcon test.
+          source /opt/ros/humble/setup.bash
+          mapfile -t SRC_FILES < <(
+            find ground_station \( -name '*.cpp' -o -name '*.hpp' \) \
+              -not -path '*/test/*')
+          if [ "${#SRC_FILES[@]}" -eq 0 ]; then
+            echo "::notice::No non-test C++ files found — skipping cppcheck"
+            exit 0
+          fi
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --std=c++17 \
+            --language=c++ \
+            -I/opt/ros/humble/include \
+            "${SRC_FILES[@]}"
+
+      - name: Lint summary
+        if: steps.check.outputs.skip != 'true'
+        run: echo "::notice::Ground station cppcheck passed"
