@@ -55,6 +55,7 @@ class PointcloudAssembler {
  private:
   struct CloudEntry {
     sensor_msgs::msg::PointCloud2 cloud;
+    // cppcheck-suppress unusedStructMember
     int64_t stamp_ns;  ///< stamp in nanoseconds since epoch for expiry checks
   };
 

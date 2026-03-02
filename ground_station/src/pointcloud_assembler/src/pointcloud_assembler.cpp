@@ -1,6 +1,7 @@
 #include "pointcloud_assembler/pointcloud_assembler.hpp"
 
 #include <cstring>
+#include <numeric>
 
 namespace pointcloud_assembler {
 
@@ -63,12 +64,13 @@ sensor_msgs::msg::PointCloud2 PointcloudAssembler::assemble(
   }
 
   // Sum data bytes from all clouds with a matching point_step.
-  size_t total_bytes = 0;
-  for (const auto& entry : buffer_) {
-    if (entry.cloud.point_step == out.point_step) {
-      total_bytes += entry.cloud.data.size();
-    }
-  }
+  size_t total_bytes = std::accumulate(
+      buffer_.begin(), buffer_.end(), size_t{0},
+      [&out](size_t acc, const auto& entry) {
+        return acc + (entry.cloud.point_step == out.point_step
+                          ? entry.cloud.data.size()
+                          : size_t{0});
+      });
 
   out.data.resize(total_bytes);
   size_t offset = 0;
@@ -89,13 +91,13 @@ sensor_msgs::msg::PointCloud2 PointcloudAssembler::assemble(
 size_t PointcloudAssembler::buffer_size() const { return buffer_.size(); }
 
 size_t PointcloudAssembler::total_points() const {
-  size_t total = 0;
-  for (const auto& entry : buffer_) {
-    if (entry.cloud.point_step > 0) {
-      total += entry.cloud.data.size() / entry.cloud.point_step;
-    }
-  }
-  return total;
+  return std::accumulate(
+      buffer_.begin(), buffer_.end(), size_t{0},
+      [](size_t acc, const auto& entry) {
+        return acc + (entry.cloud.point_step > 0
+                          ? entry.cloud.data.size() / entry.cloud.point_step
+                          : size_t{0});
+      });
 }
 
 }  // namespace pointcloud_assembler
