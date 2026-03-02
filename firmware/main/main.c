@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
@@ -13,9 +15,12 @@
 #include <rclc/executor.h>
 #include <rmw_microros/rmw_microros.h>
 #include <rmw_microxrcedds_c/config.h>
+#include <rosidl_runtime_c/string_functions.h>
+#include <sensor_msgs/msg/compressed_image.h>
 #include <uros_network_interfaces.h>
 
 #include "mavlink_bridge.h"
+#include "ov2640.h"
 
 static const char *TAG = "drone_onboard";
 
@@ -39,6 +44,43 @@ static const char *TAG = "drone_onboard";
                      __LINE__);                                                \
         }                                                                      \
     } while (0)
+
+/* DESIGN: 64KB JPEG buffer covers QVGA/CIF typical output.
+   Allocated in PSRAM to preserve internal SRAM for stack/heap. */
+#define CAMERA_JPEG_BUF_SIZE (64 * 1024)
+
+static rcl_publisher_t camera_pub;
+static sensor_msgs__msg__CompressedImage camera_msg;
+
+static void camera_timer_cb(rcl_timer_t *timer, int64_t last_call_time)
+{
+    (void)last_call_time;
+    if (timer == NULL) {
+        return;
+    }
+
+    ov2640_frame_t frame;
+    if (ov2640_capture(&frame) != ESP_OK) {
+        return;
+    }
+
+    if (frame.len <= camera_msg.data.capacity) {
+        memcpy(camera_msg.data.data, frame.buf, frame.len);
+        camera_msg.data.size = frame.len;
+
+        int64_t now_us = esp_timer_get_time();
+        camera_msg.header.stamp.sec = (int32_t)(now_us / 1000000);
+        camera_msg.header.stamp.nanosec =
+            (uint32_t)((now_us % 1000000) * 1000);
+
+        RCSOFTCHECK(rcl_publish(&camera_pub, &camera_msg, NULL));
+    } else {
+        ESP_LOGW(TAG, "JPEG too large (%u > %u)", (unsigned)frame.len,
+                 (unsigned)camera_msg.data.capacity);
+    }
+
+    ov2640_release();
+}
 
 static void micro_ros_task(void *arg)
 {
@@ -70,11 +112,38 @@ static void micro_ros_task(void *arg)
     RCCHECK(rclc_node_init_default(&node, node_name, ns, &support));
     ESP_LOGI(TAG, "node '%s/%s' created", ns, node_name);
 
-    /* Executor handles: MAVLink subscriber (1).  Will grow as ToF and
-       camera publishers are added in subsequent PRs. */
-    const unsigned int num_handles = MAVLINK_BRIDGE_NUM_HANDLES;
+    /* --- Camera publisher (best-effort QoS for sensor data) --- */
+    RCCHECK(rclc_publisher_init_best_effort(
+        &camera_pub, &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, CompressedImage),
+        "camera/compressed"));
+
+    /* Pre-allocate CompressedImage message fields */
+    char frame_id[32];
+    snprintf(frame_id, sizeof(frame_id), "drone_%d_camera", CONFIG_DRONE_ID);
+    rosidl_runtime_c__String__assign(&camera_msg.header.frame_id, frame_id);
+    rosidl_runtime_c__String__assign(&camera_msg.format, "jpeg");
+
+    camera_msg.data.data =
+        (uint8_t *)heap_caps_malloc(CAMERA_JPEG_BUF_SIZE, MALLOC_CAP_SPIRAM);
+    if (camera_msg.data.data == NULL) {
+        ESP_LOGE(TAG, "failed to allocate JPEG buffer in PSRAM");
+        vTaskDelete(NULL);
+    }
+    camera_msg.data.capacity = CAMERA_JPEG_BUF_SIZE;
+    camera_msg.data.size = 0;
+
+    /* --- Camera timer (10 Hz = 100 ms per CLAUDE.md spec) --- */
+    rcl_timer_t camera_timer;
+    RCCHECK(rclc_timer_init_default(&camera_timer, &support,
+                                    RCL_MS_TO_NS(100), camera_timer_cb));
+
+    /* Executor handles: camera timer (1) + MAVLink subscriber.
+       Will grow as ToF publisher is added. */
+    const unsigned int num_handles = 1 + MAVLINK_BRIDGE_NUM_HANDLES;
     RCCHECK(
         rclc_executor_init(&executor, &support.context, num_handles, &allocator));
+    RCCHECK(rclc_executor_add_timer(&executor, &camera_timer));
 
     /* MAVLink serial bridge (UART ↔ micro-ROS) */
     RCCHECK(mavlink_bridge_create(&node, &executor));
@@ -114,7 +183,10 @@ void app_main(void)
        publisher/subscriber that uses it. */
     ESP_ERROR_CHECK(mavlink_bridge_init());
 
-    /* DESIGN: 16KB stack for micro-ROS task; sufficient for node + executor.
-       Will need increase when ToF/camera publishers are added. */
-    xTaskCreate(micro_ros_task, "uros", 16384, NULL, 5, NULL);
+    /* Initialize OV2640 camera before starting micro-ROS task */
+    ESP_ERROR_CHECK(ov2640_init());
+
+    /* DESIGN: 24KB stack for micro-ROS task; increased from 16KB to
+       accommodate camera publisher and JPEG buffer operations. */
+    xTaskCreate(micro_ros_task, "uros", 24576, NULL, 5, NULL);
 }
