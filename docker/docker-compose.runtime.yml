@@ -1,0 +1,50 @@
+# Runtime Docker Compose — ground station on macOS (Apple Silicon)
+#
+# Usage:
+#   docker compose -f docker/docker-compose.runtime.yml build
+#   docker compose -f docker/docker-compose.runtime.yml up
+#   docker compose -f docker/docker-compose.runtime.yml up ground-station
+
+services:
+  # micro-ROS agent: UDP ↔ ROS 2 bridge for drone topics over WiFi mesh.
+  # DESIGN: macOS Docker Desktop does not support network_mode: host.
+  # Port 8888/udp is forwarded so drone firmware can reach the agent at
+  # <mac-ip>:8888 on the local WiFi network. Configure drone firmware with
+  # MICRO_ROS_AGENT_IP = <mac-ip> and MICRO_ROS_AGENT_PORT = 8888.
+  micro-ros-agent:
+    image: microros/micro-ros-agent:humble
+    platform: linux/arm64
+    command: udp4 --port 8888
+    ports:
+      - "8888:8888/udp"
+    restart: unless-stopped
+
+  # Ground station: all ROS 2 nodes in one container.
+  # DESIGN: Foxglove bridge runs inside this container so all nodes share
+  # one ROS domain without cross-container DDS multicast issues on macOS.
+  # Open Foxglove Studio and connect to ws://localhost:8765 to visualize.
+  ground-station:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ground-runtime
+    platform: linux/arm64
+    volumes:
+      # Source mounts — edit on Mac, changes picked up on next colcon build.
+      - ../ground_station:/ws/src/ground_station:ro
+      - ../msgs:/ws/src/msgs:ro
+      # Persistent build artifacts so incremental rebuilds after restart are fast.
+      - ground-station-build:/ws/build
+      - ground-station-install:/ws/install
+      - ground-station-log:/ws/log
+    environment:
+      - ROS_DOMAIN_ID=0
+    ports:
+      - "8765:8765"  # Foxglove WebSocket — connect Foxglove Studio to ws://localhost:8765
+    depends_on:
+      - micro-ros-agent
+    restart: unless-stopped
+
+volumes:
+  ground-station-build:
+  ground-station-install:
+  ground-station-log:
