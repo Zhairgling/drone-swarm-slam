@@ -1,0 +1,11 @@
+menu "Drone Swarm Config"
+
+    config DRONE_ID
+        int "Drone ID (1-255)"
+        default 1
+        range 1 255
+        help
+            Unique identifier for this drone in the swarm.
+            Determines ROS 2 namespace: /drone_N/
+
+endmenu

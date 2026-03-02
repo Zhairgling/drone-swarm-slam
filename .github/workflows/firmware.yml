@@ -26,10 +26,12 @@ jobs:
     name: ESP-IDF Build (ESP32-S3)
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.3
+      image: espressif/idf:v5.2.3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Check firmware directory exists
         id: check
@@ -40,6 +42,13 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Install micro-ROS build dependencies
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          pip3 install catkin_pkg lark-parser empy==3.3.4 colcon-common-extensions
 
       - name: Build firmware
         if: steps.check.outputs.skip != 'true'
