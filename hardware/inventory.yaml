@@ -1,0 +1,233 @@
+# hardware/inventory.yaml
+# Single source of truth for all hardware in the Drone Swarm SLAM project.
+# Cross-reference: docs/hardware_wiring.md for detailed pinout diagrams.
+
+schema_version: "1.0"
+
+drones:
+  - id: 1
+    name: "Drone 1"
+
+    frame:
+      model: "Flywoo Explorer LR 4 HD DJI O3"
+      size_inches: 4
+      bare_weight_g: 168.4
+      notes: "LR (long range) frame, 20×20 mounting pattern"
+
+    flight_controller:
+      model: "Matek H743-MINI V3"
+      mcu: "STM32H743"
+      firmware: "ArduCopter"
+      notes: "5V BEC output at 1.5A continuous used to power companion"
+      serial_ports:
+        - port: SERIAL0
+          hw_uart: USB
+          protocol: "MSP / CLI"
+          notes: "USB-C connector on board"
+        - port: SERIAL1
+          hw_uart: UART2
+          protocol: "CRSF (ELRS RC)"
+          baud: 420000
+          wiring:
+            fc_tx: TX2
+            fc_rx: RX2
+          notes: "Inverted SBUS or CRSF; use CRSF for ELRS"
+        - port: SERIAL2
+          hw_uart: UART3
+          protocol: "GPS (NMEA / UBX)"
+          baud: 115200
+          wiring:
+            fc_tx: TX3
+            fc_rx: RX3
+          notes: "M100QMC-5883L GPS+compass. Compass on I2C1 (separate)"
+        - port: SERIAL3
+          hw_uart: UART7
+          protocol: "MAVLink (MTF-02P optical flow)"
+          baud: 115200
+          wiring:
+            fc_tx: TX7
+            fc_rx: RX7
+          notes: >
+            MicoAir MTF-02P wired here. Set SERIAL3_PROTOCOL=1 (MAVLink),
+            FLOW_TYPE=6 (MAVLink). Lidar data arrives on same UART.
+        - port: SERIAL6
+          hw_uart: UART4
+          protocol: "MAVLink 2 (companion computer)"
+          baud: 921600
+          wiring:
+            fc_tx: TX4  # MCU pin PB9
+            fc_rx: RX4  # MCU pin PB8
+          ardupilot_params:
+            SERIAL6_PROTOCOL: 2   # MAVLink2
+            SERIAL6_BAUD: 921     # 921600
+          notes: "Connected to XIAO ESP32S3 Sense. 3.3V logic — no level shifter needed (UART4 is 5V tolerant)"
+
+    companion:
+      model: "Seeed XIAO ESP32S3 Sense"
+      cpu: "ESP32-S3 dual-core Xtensa LX7 @ 240 MHz"
+      sram_kb: 512
+      psram_mb: 8
+      psram_type: "OPI (Octal SPI)"
+      flash_mb: 8
+      wifi: "2.4 GHz 802.11b/g/n (single-band — no 5 GHz)"
+      ros_node: "drone_1_onboard"
+      transport: "micro-ROS over UDP"
+      gpio_assignments:
+        GPIO2:  "LPn — VL53L8CX #0 (front)"
+        GPIO3:  "LPn — VL53L8CX #1 (right)"
+        GPIO4:  "LPn — VL53L8CX #2 (back)"
+        GPIO5:  "LPn — VL53L8CX #3 (left)"
+        GPIO6:  "I2C SDA (shared bus — all 4 ToF)"
+        GPIO7:  "I2C SCL (shared bus — all 4 ToF)"
+        GPIO8:  "INT (optional, OR-wired open-drain from all 4 ToF)"
+        GPIO20: "UART RX → H743 TX4 (PB9)"
+        GPIO21: "UART TX → H743 RX4 (PB8)"
+      camera:
+        model: "OV2640"
+        type: "rolling shutter"
+        role: "secondary / telemetry"
+        notes: "Onboard on XIAO module. NOT primary SLAM sensor."
+      power:
+        source: "H743 5V BEC"
+        connector: "5V pad on XIAO"
+        typical_current_ma: 300
+      known_limitations:
+        - "WiFi 2.4 GHz only — no 5 GHz band support"
+        - "PSRAM is shared bus with flash; sustained throughput ~30 MB/s"
+        - "OV2640 rolling shutter causes motion artefacts; prefer ToF for SLAM"
+
+    tof_sensors:
+      model: "VL53L8CX"
+      count: 4
+      interface: "I2C (shared bus)"
+      i2c_speed_khz: 1000
+      fov_deg: 45
+      resolution: "8×8 zones"
+      rate_hz: 15
+      power_v: 3.3
+      typical_current_ma_each: 20
+      ros_topic_template: "/drone_1/tof/pointcloud"
+      sensors:
+        - index: 0
+          placement: "front"
+          i2c_address: "0x29"
+          lpn_gpio: "GPIO2"
+        - index: 1
+          placement: "right"
+          i2c_address: "0x2A"
+          lpn_gpio: "GPIO3"
+        - index: 2
+          placement: "back"
+          i2c_address: "0x2B"
+          lpn_gpio: "GPIO4"
+        - index: 3
+          placement: "left"
+          i2c_address: "0x2C"
+          lpn_gpio: "GPIO5"
+      notes: >
+        All sensors share default address 0x29 at power-on. Firmware assigns
+        unique addresses at boot by sequencing LPn pins (see docs/hardware_wiring.md).
+        Addresses reset to 0x29 on power cycle — sequencing runs every boot.
+
+    gps:
+      model: "M100QMC-5883L"
+      gnss_chip: "M10050-KB"
+      compass_chip: "QMC5883L"
+      uart_protocol: "NMEA / UBX"
+      uart_port: "SERIAL2 (UART3)"
+      baud: 115200
+      compass_interface: "I2C1 (H743 onboard)"
+      ardupilot_params:
+        GPS1_TYPE: 1         # Auto
+        COMPASS_USE: 1
+      notes: "Combo GPS+compass module. Connect UART to TX3/RX3, compass to FC I2C1."
+
+    motors:
+      model: "Nin V2 1404 2750kv"
+      count: 4
+      kv: 2750
+      stator_diameter_mm: 14
+      stator_height_mm: 4
+      props: "4024-2 (4 inch, 2-blade)"
+
+    esc:
+      model: "GOKU F722 MINI V2 40A BLS"
+      form_factor: "20×20 mm"
+      ampere_rating: 40
+      protocol: "BLHeli_S / DSHOT300"
+      notes: >
+        This is the ESC portion only. The integrated FC on this board is NOT
+        used — replaced by H743-MINI V3. Only the ESC stack is retained.
+
+    battery:
+      model: "Explorer Lionpack 18650"
+      cells: "Sony VTC6 18650"
+      configuration: "4S1P"
+      nominal_voltage_v: 14.8
+      capacity_mah: 3000
+      connector: "XT30"
+      notes: "High-drain 18650 cells; 30A continuous discharge"
+
+    rc:
+      protocol: "ELRS (ExpressLRS)"
+      uart_port: "SERIAL1 (UART2)"
+      link_type: "CRSF"
+      notes: "Set SERIAL1_PROTOCOL=23 (RCIN) in ArduCopter"
+
+    optical_flow_lidar:
+      model: "MicoAir MTF-02P"
+      sensors: ["optical flow", "lidar (ToF)"]
+      uart_port: "SERIAL3 (UART7)"
+      baud: 115200
+      protocol: "MAVLink"
+      power_v: 5
+      wiring:
+        fc_tx: TX7   # → MTF-02P RX
+        fc_rx: RX7   # ← MTF-02P TX
+        power: "H743 5V pad"
+        ground: "H743 GND"
+      ardupilot_params:
+        SERIAL3_PROTOCOL: 1   # MAVLink
+        FLOW_TYPE: 6          # MAVLink optical flow
+        RNGFND1_TYPE: 10      # MAVLink rangefinder
+        RNGFND1_MAX_CM: 800
+        RNGFND1_MIN_CM: 5
+      notes: >
+        MTF-02P sends optical flow data and downward lidar range over a single
+        MAVLink UART. Provides altitude hold and indoor position hold capability.
+        Mount facing straight down, aligned with drone X-axis (forward).
+
+    # -----------------------------------------------------------------------
+    # Optimal wiring summary (H743-MINI V3 serial port allocation)
+    # -----------------------------------------------------------------------
+    # SERIAL0 (USB)     : GCS / configurator
+    # SERIAL1 (UART2)   : ELRS RC receiver (CRSF, 420000 baud)
+    # SERIAL2 (UART3)   : M100QMC-5883L GPS (NMEA/UBX, 115200 baud)
+    # SERIAL3 (UART7)   : MicoAir MTF-02P optical flow + lidar (MAVLink, 115200)
+    # SERIAL6 (UART4)   : XIAO ESP32S3 companion (MAVLink2, 921600 baud)
+    #
+    # I2C1 (FC onboard) : QMC5883L compass (from GPS combo module)
+    # I2C (XIAO)        : 4× VL53L8CX ToF sensors (1 MHz, shared bus)
+    # -----------------------------------------------------------------------
+    wiring_notes:
+      - "SERIAL4/SERIAL7 remain available for future peripherals (e.g., telemetry radio)"
+      - "H743 5V BEC powers XIAO (300 mA) and MTF-02P (~150 mA); total ~450 mA well within 1.5A BEC rating"
+      - "XIAO 3V3 LDO powers all 4 VL53L8CX (80 mA total); within 700 mA LDO rating"
+      - "No logic-level shifters required: UART4 H743 pins are 5V tolerant; XIAO outputs 3.3V"
+      - "Keep I2C wires under 8 cm; route away from ESC/motor wires to suppress EMI"
+      - "Cross-reference docs/hardware_wiring.md for full pinout diagrams"
+
+ground_station:
+  name: "Ground Station"
+  hardware:
+    model: "Apple MacBook Pro"
+    chip: "M4 Max"
+    ram_gb: 64
+    os: "macOS"
+  software:
+    ros_distro: "Humble"
+    bridge: "micro-ROS agent (UDP)"
+  networking:
+    wifi_band: "2.4 GHz"
+    topology: "planned mesh"
+    notes: "Drone WiFi is 2.4 GHz only (ESP32-S3 hardware limitation); ground station must operate on 2.4 GHz band"
