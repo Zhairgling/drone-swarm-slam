@@ -39,6 +39,10 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install micro-ROS build dependencies
+        if: steps.check.outputs.skip != 'true'
+        run: pip3 install catkin_pkg lark-parser empy==3.3.4 colcon-common-extensions
+
       - name: Build firmware
         if: steps.check.outputs.skip != 'true'
         working-directory: firmware
