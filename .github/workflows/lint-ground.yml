@@ -152,7 +152,19 @@ jobs:
           # DESIGN: Running in ros:humble gives us /opt/ros/humble/include for installed
           # ROS 2 package headers. missingIncludeSystem suppresses angle-bracket includes
           # that cppcheck cannot resolve (e.g. auto-generated msg headers not on disk).
+          #
+          # DESIGN: Exclude */test/* directories. GTest macros (TEST(), EXPECT_*()) produce
+          # cppcheck syntaxError when gtest.h is unavailable — the error fires during
+          # parsing, before inline suppression directives are processed. Test code is
+          # already validated by the GTest runner via colcon test.
           source /opt/ros/humble/setup.bash
+          mapfile -t SRC_FILES < <(
+            find ground_station \( -name '*.cpp' -o -name '*.hpp' \) \
+              -not -path '*/test/*')
+          if [ "${#SRC_FILES[@]}" -eq 0 ]; then
+            echo "::notice::No non-test C++ files found — skipping cppcheck"
+            exit 0
+          fi
           cppcheck \
             --enable=warning,style,performance,portability \
             --error-exitcode=1 \
@@ -163,7 +175,7 @@ jobs:
             --std=c++17 \
             --language=c++ \
             -I/opt/ros/humble/include \
-            ground_station/
+            "${SRC_FILES[@]}"
 
       - name: Lint summary
         if: steps.check.outputs.skip != 'true'
