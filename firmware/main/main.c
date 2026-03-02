@@ -15,6 +15,8 @@
 #include <rmw_microxrcedds_c/config.h>
 #include <uros_network_interfaces.h>
 
+#include "mavlink_bridge.h"
+
 static const char *TAG = "drone_onboard";
 
 /* DESIGN: abort on micro-ROS init errors (same philosophy as ESP_ERROR_CHECK) */
@@ -68,11 +70,15 @@ static void micro_ros_task(void *arg)
     RCCHECK(rclc_node_init_default(&node, node_name, ns, &support));
     ESP_LOGI(TAG, "node '%s/%s' created", ns, node_name);
 
-    /* DESIGN: executor handles = 0 for scaffold; will grow as publishers/
-       subscriptions are added in subsequent PRs (ToF, camera, MAVLink) */
-    const unsigned int num_handles = 1;
+    /* Executor handles: MAVLink subscriber (1).  Will grow as ToF and
+       camera publishers are added in subsequent PRs. */
+    const unsigned int num_handles = MAVLINK_BRIDGE_NUM_HANDLES;
     RCCHECK(
         rclc_executor_init(&executor, &support.context, num_handles, &allocator));
+
+    /* MAVLink serial bridge (UART ↔ micro-ROS) */
+    RCCHECK(mavlink_bridge_create(&node, &executor));
+    RCCHECK(mavlink_bridge_start());
 
     ESP_LOGI(TAG, "spinning...");
     while (true) {
@@ -103,6 +109,10 @@ void app_main(void)
        (SSID/password set in menuconfig, not hardcoded). Will be replaced
        by custom WiFi mesh component when multi-drone networking is added. */
     ESP_ERROR_CHECK(uros_network_interface_initialize());
+
+    /* MAVLink UART must be ready before the micro-ROS task creates the
+       publisher/subscriber that uses it. */
+    ESP_ERROR_CHECK(mavlink_bridge_init());
 
     /* DESIGN: 16KB stack for micro-ROS task; sufficient for node + executor.
        Will need increase when ToF/camera publishers are added. */

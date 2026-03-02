@@ -1,0 +1,30 @@
+menu "MAVLink Bridge"
+
+    config MAVLINK_UART_NUM
+        int "UART peripheral number"
+        default 1
+        range 0 2
+        help
+            UART peripheral used for the MAVLink connection to the flight
+            controller.  UART0 is usually reserved for the console log.
+
+    config MAVLINK_UART_TX_PIN
+        int "TX GPIO pin"
+        default 21
+        help
+            GPIO pin for UART TX to the flight controller (→ H743 RX4).
+
+    config MAVLINK_UART_RX_PIN
+        int "RX GPIO pin"
+        default 20
+        help
+            GPIO pin for UART RX from the flight controller (← H743 TX4).
+
+    config MAVLINK_UART_BAUD
+        int "Baud rate"
+        default 921600
+        help
+            Baud rate for the MAVLink UART link.  Must match ArduCopter
+            SERIAL6_BAUD (921 = 921600).
+
+endmenu
