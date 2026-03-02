@@ -1,0 +1,19 @@
+# Docker Compose for CI builds
+# Usage:
+#   docker compose -f docker/docker-compose.yml run firmware-build
+#   docker compose -f docker/docker-compose.yml run ground-build
+
+services:
+  firmware-build:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.firmware
+    volumes:
+      - ..:/project:ro
+
+  ground-build:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.ground
+    volumes:
+      - ..:/project:ro

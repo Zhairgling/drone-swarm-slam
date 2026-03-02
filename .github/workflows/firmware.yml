@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'firmware/**'
+      - 'docker/Dockerfile.firmware'
+      - 'docker/docker-compose.yml'
       - '.github/workflows/firmware.yml'
   pull_request:
     branches: [main]
     paths:
       - 'firmware/**'
+      - 'docker/Dockerfile.firmware'
+      - 'docker/docker-compose.yml'
       - '.github/workflows/firmware.yml'
   workflow_dispatch:
 

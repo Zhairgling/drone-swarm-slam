@@ -1,0 +1,30 @@
+# Ground station CI build — ROS 2 Humble with C++17 tooling
+# Usage: docker compose -f docker/docker-compose.yml run ground-build
+
+FROM ros:humble-ros-base
+
+# Install build tools and linters required by project conventions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        clang-tidy \
+        cppcheck \
+        python3-colcon-common-extensions \
+        python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure rosdep is initialized
+RUN rosdep update --rosdistro=humble || true
+
+WORKDIR /project
+
+# Copy source to writable build dir, install deps, build, and test
+CMD ["bash", "-c", "\
+    cp -r /project/ground_station /build && \
+    cd /build && \
+    source /opt/ros/humble/setup.bash && \
+    rosdep install --from-paths . --ignore-src -y || true && \
+    colcon build --symlink-install && \
+    colcon test && \
+    colcon test-result --verbose \
+"]

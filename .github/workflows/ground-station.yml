@@ -6,12 +6,16 @@ on:
     paths:
       - 'ground_station/**'
       - 'msgs/**'
+      - 'docker/Dockerfile.ground'
+      - 'docker/docker-compose.yml'
       - '.github/workflows/ground-station.yml'
   pull_request:
     branches: [main]
     paths:
       - 'ground_station/**'
       - 'msgs/**'
+      - 'docker/Dockerfile.ground'
+      - 'docker/docker-compose.yml'
       - '.github/workflows/ground-station.yml'
   workflow_dispatch:
 
