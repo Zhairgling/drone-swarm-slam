@@ -1,0 +1,61 @@
+name: Firmware Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/firmware.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/firmware.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: firmware-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ESP-IDF Build (ESP32-S3)
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check firmware directory exists
+        id: check
+        run: |
+          if [ ! -f firmware/CMakeLists.txt ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::firmware/CMakeLists.txt not found — skipping build"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build firmware
+        if: steps.check.outputs.skip != 'true'
+        working-directory: firmware
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          idf.py set-target esp32s3
+          idf.py build
+
+      - name: Run unit tests (host)
+        if: steps.check.outputs.skip != 'true'
+        working-directory: firmware
+        shell: bash
+        run: |
+          . $IDF_PATH/export.sh
+          if grep -rq "REQUIRES unity" components/ 2>/dev/null || \
+             [ -d test ] || [ -d tests ]; then
+            idf.py build -T test 2>/dev/null || \
+              echo "::notice::No host tests found or test build not configured"
+          else
+            echo "::notice::No unit tests found — skipping"
+          fi

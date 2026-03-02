@@ -1,0 +1,69 @@
+name: Ground Station Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ground_station/**'
+      - 'msgs/**'
+      - '.github/workflows/ground-station.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ground_station/**'
+      - 'msgs/**'
+      - '.github/workflows/ground-station.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ground-station-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ROS 2 Humble Build & Test
+    runs-on: ubuntu-latest
+    container:
+      image: ros:humble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check ground_station directory exists
+        id: check
+        run: |
+          if [ ! -f ground_station/package.xml ] && \
+             ! find ground_station -name 'package.xml' -print -quit 2>/dev/null | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::No package.xml found in ground_station/ — skipping build"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq python3-colcon-common-extensions > /dev/null
+          source /opt/ros/humble/setup.bash
+          rosdep update --rosdistro=humble
+          rosdep install --from-paths ground_station msgs \
+            --ignore-src -y --rosdistro=humble 2>/dev/null || true
+
+      - name: Build
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --packages-up-to-regex 'drone_swarm_.*' \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+      - name: Test
+        if: steps.check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          source install/setup.bash
+          colcon test --packages-up-to-regex 'drone_swarm_.*'
+          colcon test-result --verbose
