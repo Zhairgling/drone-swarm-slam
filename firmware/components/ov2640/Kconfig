@@ -1,0 +1,41 @@
+menu "OV2640 Camera Driver"
+
+    config OV2640_JPEG_QUALITY
+        int "JPEG quality (0-63, lower is better)"
+        default 12
+        range 0 63
+        help
+            JPEG compression quality. Lower values produce higher quality
+            images but larger file sizes. 12 is a good balance for
+            compressed image streaming over micro-ROS UDP transport.
+
+    choice OV2640_FRAME_SIZE
+        prompt "Frame resolution"
+        default OV2640_FRAME_SIZE_QVGA
+        help
+            Camera capture resolution. Smaller resolutions reduce JPEG
+            size and micro-ROS transport bandwidth. QVGA is the default
+            as this camera is supplementary (NOT the primary SLAM sensor).
+
+        config OV2640_FRAME_SIZE_QQVGA
+            bool "QQVGA (160x120)"
+        config OV2640_FRAME_SIZE_QVGA
+            bool "QVGA (320x240)"
+        config OV2640_FRAME_SIZE_CIF
+            bool "CIF (400x296)"
+        config OV2640_FRAME_SIZE_VGA
+            bool "VGA (640x480)"
+        config OV2640_FRAME_SIZE_SVGA
+            bool "SVGA (800x600)"
+    endchoice
+
+    config OV2640_FB_COUNT
+        int "Frame buffer count"
+        default 2
+        range 1 3
+        help
+            Number of frame buffers in PSRAM. 2 enables double-buffering
+            so capture continues while the previous frame is transmitted.
+            More buffers use more PSRAM but reduce frame drops.
+
+endmenu
