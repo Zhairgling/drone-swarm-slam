@@ -1,0 +1,35 @@
+# companion_serial.param — SERIAL6 config for XIAO ESP32S3 companion
+# Hardware: Matek H743-MINI V3 UART4 (TX4=PB9, RX4=PB8) ↔ XIAO GPIO21/20
+# See: docs/hardware_wiring.md — "UART Configuration (MAVLink)"
+#
+# Format: NAME VALUE   (ArduPilot param file format)
+# Import: Mission Planner → Config → Full Parameter List → Load from file
+#         MAVProxy: param load companion_serial.param
+#
+# Apply these BEFORE connecting the XIAO companion for the first time.
+
+# ---------------------------------------------------------------------------
+# SERIAL6 — ArduPilot name for UART4 on the H743-MINI V3
+# ---------------------------------------------------------------------------
+SERIAL6_PROTOCOL 2     # MAVLink2 (2 = MAVLink2, 1 = MAVLink1)
+SERIAL6_BAUD 921       # 921600 baud (ArduPilot encodes as kbaud: 921 = 921600)
+
+# DESIGN: SERIAL6 maps to the physical UART4 pads (TX4/RX4) on the H743-MINI V3.
+# ArduPilot's SERIAL numbering is board-specific — verify with the H743-MINI V3
+# hwdef if ever upgrading firmware. The XIAO outputs 3.3V logic; the H743 UART4
+# input is 5V-tolerant — no level shifter is needed.
+
+# ---------------------------------------------------------------------------
+# Stream rates for telemetry sent to companion (XIAO / micro-ROS)
+# ---------------------------------------------------------------------------
+# DESIGN: The companion only needs attitude, position, and heartbeat.
+# Keeping rates low reduces UART bandwidth and leaves CPU headroom on the H743.
+SR6_ATTITUDE 10        # Attitude (roll/pitch/yaw) at 10 Hz
+SR6_POSITION 5         # Position (lat/lon/alt) at 5 Hz
+SR6_EXT_STAT 2         # Extended status (sys/GPS status) at 2 Hz
+SR6_EXTRA1 4           # Extra1 (airspeed, throttle) at 4 Hz
+SR6_EXTRA2 0           # Extra2 (VFR HUD) — not needed by companion
+SR6_EXTRA3 0           # Extra3 (AHRS, etc.) — not needed by companion
+SR6_RAW_SENS 0         # Raw sensor data — not needed by companion
+SR6_RC_CHAN 0          # RC channel data — not needed by companion
+SR6_RAW_CTRL 0         # Raw control — not needed by companion
