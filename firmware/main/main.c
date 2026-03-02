@@ -11,6 +11,7 @@
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
+#include <rmw_microros/rmw_microros.h>
 #include <rmw_microxrcedds_c/config.h>
 #include <uros_network_interfaces.h>
 
