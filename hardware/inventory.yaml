@@ -1,6 +1,10 @@
 # hardware/inventory.yaml
 # Single source of truth for all hardware in the Drone Swarm SLAM project.
 # Cross-reference: docs/hardware_wiring.md for detailed pinout diagrams.
+#
+# SERIAL_ORDER for Matek H743-MINI V3 (from ArduPilot hwdef.dat):
+#   SERIAL0=USB, SERIAL1=UART7, SERIAL2=USART1, SERIAL3=USART2,
+#   SERIAL4=USART3, SERIAL5=UART8, SERIAL6=UART4, SERIAL7=USART6
 
 schema_version: "1.0"
 
@@ -19,37 +23,55 @@ drones:
       mcu: "STM32H743"
       firmware: "ArduCopter"
       notes: "5V BEC output at 1.5A continuous used to power companion"
+      # SERIAL numbers ≠ UART numbers on H743-MINI V3; see hwdef.dat SERIAL_ORDER.
       serial_ports:
         - port: SERIAL0
           hw_uart: USB
           protocol: "MSP / CLI"
           notes: "USB-C connector on board"
         - port: SERIAL1
-          hw_uart: UART2
-          protocol: "CRSF (ELRS RC)"
-          baud: 420000
-          wiring:
-            fc_tx: TX2
-            fc_rx: RX2
-          notes: "Inverted SBUS or CRSF; use CRSF for ELRS"
-        - port: SERIAL2
-          hw_uart: UART3
-          protocol: "GPS (NMEA / UBX)"
-          baud: 115200
-          wiring:
-            fc_tx: TX3
-            fc_rx: RX3
-          notes: "M100QMC-5883L GPS+compass. Compass on I2C1 (separate)"
-        - port: SERIAL3
           hw_uart: UART7
-          protocol: "MAVLink (MTF-02P optical flow)"
+          protocol: "MAVLink (MTF-02P optical flow + lidar)"
           baud: 115200
           wiring:
             fc_tx: TX7
             fc_rx: RX7
-          notes: >
-            MicoAir MTF-02P wired here. Set SERIAL3_PROTOCOL=1 (MAVLink),
-            FLOW_TYPE=6 (MAVLink). Lidar data arrives on same UART.
+          ardupilot_params:
+            SERIAL1_PROTOCOL: 1   # MAVLink
+            FLOW_TYPE: 6          # MAVLink optical flow
+            RNGFND1_TYPE: 10      # MAVLink rangefinder
+            RNGFND1_MAX_CM: 800
+            RNGFND1_MIN_CM: 5
+          notes: "MicoAir MTF-02P wired to TX7/RX7. Lidar range arrives on same UART."
+        - port: SERIAL2
+          hw_uart: USART1
+          protocol: "GPS (NMEA / UBX)"
+          baud: 115200
+          wiring:
+            fc_tx: TX1
+            fc_rx: RX1
+          ardupilot_params:
+            GPS1_TYPE: 1     # Auto
+            COMPASS_USE: 1
+          notes: "M100QMC-5883L GPS wired to TX1/RX1. Compass on FC I2C1 (separate pads)."
+        - port: SERIAL3
+          hw_uart: USART2
+          protocol: "available"
+          wiring:
+            fc_tx: TX2
+            fc_rx: RX2
+          notes: "Reserved for future use (e.g., telemetry radio)"
+        - port: SERIAL4
+          hw_uart: USART3
+          protocol: "available"
+          wiring:
+            fc_tx: TX3
+            fc_rx: RX3
+          notes: "Reserved for future use"
+        - port: SERIAL5
+          hw_uart: UART8
+          protocol: "available"
+          notes: "Reserved for future use"
         - port: SERIAL6
           hw_uart: UART4
           protocol: "MAVLink 2 (companion computer)"
@@ -61,6 +83,18 @@ drones:
             SERIAL6_PROTOCOL: 2   # MAVLink2
             SERIAL6_BAUD: 921     # 921600
           notes: "Connected to XIAO ESP32S3 Sense. 3.3V logic — no level shifter needed (UART4 is 5V tolerant)"
+        - port: SERIAL7
+          hw_uart: USART6
+          protocol: "CRSF (ELRS RC)"
+          baud: 420000
+          wiring:
+            fc_rx: RX6   # RX-only UART — sufficient for CRSF input
+          ardupilot_params:
+            SERIAL7_PROTOCOL: 23  # RCIN
+            SERIAL7_BAUD: 115     # ArduPilot auto-negotiates CRSF; 115200 fallback
+          notes: >
+            USART6 exposes RX6 only on H743-MINI V3. CRSF (ELRS) requires only
+            the RX line for RC input — one-wire is sufficient.
 
     companion:
       model: "Seeed XIAO ESP32S3 Sense"
@@ -134,13 +168,13 @@ drones:
       gnss_chip: "M10050-KB"
       compass_chip: "QMC5883L"
       uart_protocol: "NMEA / UBX"
-      uart_port: "SERIAL2 (UART3)"
+      uart_port: "SERIAL2 (USART1)"
       baud: 115200
+      wiring:
+        fc_tx: TX1
+        fc_rx: RX1
       compass_interface: "I2C1 (H743 onboard)"
-      ardupilot_params:
-        GPS1_TYPE: 1         # Auto
-        COMPASS_USE: 1
-      notes: "Combo GPS+compass module. Connect UART to TX3/RX3, compass to FC I2C1."
+      notes: "Combo GPS+compass module. Connect UART to TX1/RX1, compass to FC I2C1."
 
     motors:
       model: "Nin V2 1404 2750kv"
@@ -170,14 +204,20 @@ drones:
 
     rc:
       protocol: "ELRS (ExpressLRS)"
-      uart_port: "SERIAL1 (UART2)"
+      uart_port: "SERIAL7 (USART6)"
       link_type: "CRSF"
-      notes: "Set SERIAL1_PROTOCOL=23 (RCIN) in ArduCopter"
+      wiring:
+        fc_rx: RX6   # RX-only — CRSF input only needs one wire
+      ardupilot_params:
+        SERIAL7_PROTOCOL: 23   # RCIN
+      notes: >
+        USART6 on H743-MINI V3 exposes RX6 only. CRSF (ELRS) is a
+        half-duplex protocol where the FC only needs the RX line for input.
 
     optical_flow_lidar:
       model: "MicoAir MTF-02P"
       sensors: ["optical flow", "lidar (ToF)"]
-      uart_port: "SERIAL3 (UART7)"
+      uart_port: "SERIAL1 (UART7)"
       baud: 115200
       protocol: "MAVLink"
       power_v: 5
@@ -187,7 +227,7 @@ drones:
         power: "H743 5V pad"
         ground: "H743 GND"
       ardupilot_params:
-        SERIAL3_PROTOCOL: 1   # MAVLink
+        SERIAL1_PROTOCOL: 1   # MAVLink
         FLOW_TYPE: 6          # MAVLink optical flow
         RNGFND1_TYPE: 10      # MAVLink rangefinder
         RNGFND1_MAX_CM: 800
@@ -198,20 +238,26 @@ drones:
         Mount facing straight down, aligned with drone X-axis (forward).
 
     # -----------------------------------------------------------------------
-    # Optimal wiring summary (H743-MINI V3 serial port allocation)
+    # Optimal wiring summary — H743-MINI V3 serial port allocation
+    # Source: ArduPilot hwdef.dat SERIAL_ORDER for this board.
+    # SERIAL numbers ≠ UART numbers — always check hwdef.dat, not UART labels.
     # -----------------------------------------------------------------------
-    # SERIAL0 (USB)     : GCS / configurator
-    # SERIAL1 (UART2)   : ELRS RC receiver (CRSF, 420000 baud)
-    # SERIAL2 (UART3)   : M100QMC-5883L GPS (NMEA/UBX, 115200 baud)
-    # SERIAL3 (UART7)   : MicoAir MTF-02P optical flow + lidar (MAVLink, 115200)
-    # SERIAL6 (UART4)   : XIAO ESP32S3 companion (MAVLink2, 921600 baud)
+    # SERIAL0 (USB)              : GCS / Mission Planner / CLI
+    # SERIAL1 (UART7,  TX7/RX7) : MicoAir MTF-02P optical flow + lidar (MAVLink, 115200)
+    # SERIAL2 (USART1, TX1/RX1) : M100QMC-5883L GPS (NMEA/UBX, 115200)
+    # SERIAL3 (USART2, TX2/RX2) : available — reserved for telemetry radio
+    # SERIAL4 (USART3, TX3/RX3) : available
+    # SERIAL5 (UART8)            : available
+    # SERIAL6 (UART4,  TX4/RX4) : XIAO ESP32S3 companion (MAVLink2, 921600)
+    # SERIAL7 (USART6, RX6)     : ELRS RC receiver (CRSF, RX-only)
     #
     # I2C1 (FC onboard) : QMC5883L compass (from GPS combo module)
     # I2C (XIAO)        : 4× VL53L8CX ToF sensors (1 MHz, shared bus)
     # -----------------------------------------------------------------------
     wiring_notes:
-      - "SERIAL4/SERIAL7 remain available for future peripherals (e.g., telemetry radio)"
-      - "H743 5V BEC powers XIAO (300 mA) and MTF-02P (~150 mA); total ~450 mA well within 1.5A BEC rating"
+      - "SERIAL numbers do NOT match UART numbers on H743-MINI V3; source: ArduPilot hwdef.dat SERIAL_ORDER"
+      - "SERIAL3/4/5 remain available for future peripherals"
+      - "H743 5V BEC powers XIAO (~300 mA) and MTF-02P (~150 mA); total ~450 mA well within 1.5A BEC rating"
       - "XIAO 3V3 LDO powers all 4 VL53L8CX (80 mA total); within 700 mA LDO rating"
       - "No logic-level shifters required: UART4 H743 pins are 5V tolerant; XIAO outputs 3.3V"
       - "Keep I2C wires under 8 cm; route away from ESC/motor wires to suppress EMI"
