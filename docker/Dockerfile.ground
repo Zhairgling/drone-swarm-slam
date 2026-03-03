@@ -40,6 +40,7 @@ CMD ["bash", "-c", "\
     source /opt/ros/humble/setup.bash && \
     rosdep install --from-paths src --ignore-src -y || true && \
     colcon build --symlink-install && \
+    source install/setup.bash && \
     colcon test && \
     colcon test-result --verbose \
 "]

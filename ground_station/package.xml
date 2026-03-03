@@ -17,6 +17,14 @@
 
   <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>python3-pytest</test_depend>
+  <!-- Integration test: nodes started as subprocesses -->
+  <test_depend>drone_swarm_tf_broadcaster</test_depend>
+  <test_depend>drone_swarm_tof_simulator</test_depend>
+  <test_depend>drone_swarm_pointcloud_assembler</test_depend>
+  <test_depend>drone_swarm_slam</test_depend>
+  <!-- rclpy + tf2_ros used in-process by the validator node -->
+  <test_depend>rclpy</test_depend>
+  <test_depend>tf2_ros</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
