@@ -16,9 +16,9 @@ constexpr size_t kMavlinkV2HeaderLen = 10;
 
 // MAVLink SYS_STATUS (msgid=1) — battery fields only.
 struct SysStatus {
-  uint16_t voltage_battery;  // mV; UINT16_MAX = not available
-  int16_t current_battery;   // cA (10*mA); -1 = not available
-  int8_t battery_remaining;  // %; -1 = not available
+  uint16_t voltage_battery;  // cppcheck-suppress unusedStructMember
+  int16_t current_battery;   // cppcheck-suppress unusedStructMember
+  int8_t battery_remaining;  // cppcheck-suppress unusedStructMember
 };
 
 /// Extract MAVLink message ID from a complete v1/v2 frame.
