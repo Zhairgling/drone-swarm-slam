@@ -49,7 +49,13 @@ jobs:
         shell: bash
         run: |
           apt-get update -qq
-          apt-get install -y -qq python3-colcon-common-extensions > /dev/null
+          # ros-humble-mavros-msgs and ros-humble-tf2-ros are not reliably
+          # found by rosdep, so install them explicitly (mirrors Dockerfile.ground).
+          apt-get install -y -qq \
+            python3-colcon-common-extensions \
+            ros-humble-mavros-msgs \
+            ros-humble-tf2-ros \
+            > /dev/null
           source /opt/ros/humble/setup.bash
           rosdep update --rosdistro=humble
           rosdep install --from-paths ground_station msgs \
@@ -60,7 +66,13 @@ jobs:
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --packages-up-to-regex 'drone_swarm_.*' \
+          # DESIGN: ground_station/src/ contains nested packages that colcon
+          # won't discover from the repo root (colcon stops recursing once it
+          # finds a package.xml). Passing both base paths mirrors the Docker
+          # workspace layout, making sub-packages discoverable and buildable.
+          colcon build \
+            --base-paths . ground_station/src \
+            --packages-up-to-regex 'drone_swarm_.*' \
             --cmake-args -DCMAKE_BUILD_TYPE=Release
 
       - name: Test
@@ -69,5 +81,7 @@ jobs:
         run: |
           source /opt/ros/humble/setup.bash
           source install/setup.bash
-          colcon test --packages-up-to-regex 'drone_swarm_.*'
+          colcon test \
+            --base-paths . ground_station/src \
+            --packages-up-to-regex 'drone_swarm_.*'
           colcon test-result --verbose
