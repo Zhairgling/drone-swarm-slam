@@ -22,7 +22,6 @@ import signal
 import subprocess
 import time
 
-import ament_index_python.packages
 import pytest
 import rclpy
 import rclpy.qos
@@ -39,15 +38,42 @@ _TIMEOUT_SEC = 30.0
 
 
 # ---------------------------------------------------------------------------
-# Helper: locate installed executables via the ament index
+# Helper: locate installed executables
 # ---------------------------------------------------------------------------
 
 def _find_executable(package: str, name: str) -> str:
-    prefix = ament_index_python.packages.get_package_prefix(package)
-    path = os.path.join(prefix, "lib", package, name)
-    if not os.path.isfile(path):
-        pytest.fail(f"Executable not found after build: {path}")
-    return path
+    """Find an installed ROS 2 executable.
+
+    Searches AMENT_PREFIX_PATH directly AND sibling install directories at
+    the same level. The latter covers CI builds where colcon installs each
+    package into its own sub-directory (e.g. install/drone_swarm_slam/) but
+    the test environment's AMENT_PREFIX_PATH only lists the packages that are
+    direct dependencies of the package under test — not every sibling.
+    """
+    ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
+    search_roots: set[str] = set()
+    for prefix in ament_prefix_path.split(":"):
+        prefix = prefix.strip()
+        if not prefix:
+            continue
+        # Direct lookup in this prefix (works when the package is listed).
+        search_roots.add(prefix)
+        # Sibling lookup: go one level up and try the target package name.
+        # This handles CI per-package install trees where AMENT_PREFIX_PATH
+        # only contains a subset of the workspace packages.
+        parent = os.path.dirname(prefix)
+        if parent:
+            search_roots.add(os.path.join(parent, package))
+
+    for root in search_roots:
+        candidate = os.path.join(root, "lib", package, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+    pytest.fail(
+        f"Could not find executable '{name}' for package '{package}'. "
+        f"AMENT_PREFIX_PATH={ament_prefix_path!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
