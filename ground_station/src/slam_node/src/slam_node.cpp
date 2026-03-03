@@ -45,7 +45,7 @@ SlamNode::SlamNode(const rclcpp::NodeOptions& options)
         "/drone_" + std::to_string(i) + "/tof/pointcloud";
     auto sub = create_subscription<sensor_msgs::msg::PointCloud2>(
         topic, sensor_qos,
-        [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
+        [this](const sensor_msgs::msg::PointCloud2& msg) {
           pointcloud_callback(msg);
         });
     subscriptions_.push_back(sub);
@@ -75,9 +75,9 @@ SlamNode::SlamNode(const rclcpp::NodeOptions& options)
 }
 
 void SlamNode::pointcloud_callback(
-    const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-  if (msg->header.frame_id == map_frame_) {
-    map_->add_pointcloud(*msg);
+    const sensor_msgs::msg::PointCloud2& msg) {
+  if (msg.header.frame_id == map_frame_) {
+    map_->add_pointcloud(msg);
     return;
   }
 
@@ -87,17 +87,17 @@ void SlamNode::pointcloud_callback(
     // Clouds arriving before TF is available are skipped, not accumulated
     // in the wrong frame.
     transform = tf_buffer_->lookupTransform(
-        map_frame_, msg->header.frame_id, msg->header.stamp,
+        map_frame_, msg.header.frame_id, msg.header.stamp,
         rclcpp::Duration::from_nanoseconds(100000000LL));
   } catch (const tf2::TransformException& ex) {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
                          "TF not available for frame '%s': %s",
-                         msg->header.frame_id.c_str(), ex.what());
+                         msg.header.frame_id.c_str(), ex.what());
     return;
   }
 
   sensor_msgs::msg::PointCloud2 cloud_map;
-  tf2::doTransform(*msg, cloud_map, transform);
+  tf2::doTransform(msg, cloud_map, transform);
   map_->add_pointcloud(cloud_map);
 }
 

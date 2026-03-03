@@ -20,8 +20,7 @@ class PoseEstimatorNode : public rclcpp::Node {
       const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
  private:
-  void pose_callback(
-      geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  void pose_callback(const geometry_msgs::msg::PoseStamped& msg);
 
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_;
   rclcpp::Publisher<mavros_msgs::msg::Mavlink>::SharedPtr pub_;
