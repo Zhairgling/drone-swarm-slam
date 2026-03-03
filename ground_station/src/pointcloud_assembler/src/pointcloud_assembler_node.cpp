@@ -3,6 +3,10 @@
 #include <chrono>
 #include <functional>
 
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <tf2/exceptions.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
+
 namespace pointcloud_assembler {
 
 PointcloudAssemblerNode::PointcloudAssemblerNode(
@@ -12,7 +16,7 @@ PointcloudAssemblerNode::PointcloudAssemblerNode(
   declare_parameter("window_duration_sec", 1.0);
   declare_parameter("max_clouds", 100);
   declare_parameter("publish_rate_hz", 10.0);
-  declare_parameter("output_frame", std::string("odom"));
+  declare_parameter("output_frame", std::string("map"));
 
   AssemblerConfig config;
   config.window_duration_sec =
@@ -22,6 +26,9 @@ PointcloudAssemblerNode::PointcloudAssemblerNode(
   assembler_ = std::make_unique<PointcloudAssembler>(config);
 
   output_frame_ = get_parameter("output_frame").as_string();
+
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // DESIGN: best_effort QoS matches real micro-ROS sensor publishers
   // (see CLAUDE.md QoS section).
@@ -63,7 +70,24 @@ PointcloudAssemblerNode::PointcloudAssemblerNode(
 
 void PointcloudAssemblerNode::on_pointcloud(
     sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-  assembler_->add_cloud(*msg);
+  geometry_msgs::msg::TransformStamped transform;
+  try {
+    // DESIGN: 100ms timeout matches the 15Hz sensor rate (66ms period).
+    // Clouds arriving before TF is available are skipped, not accumulated
+    // in the wrong frame.
+    transform = tf_buffer_->lookupTransform(
+        output_frame_, msg->header.frame_id, msg->header.stamp,
+        rclcpp::Duration::from_nanoseconds(100000000LL));
+  } catch (const tf2::TransformException& ex) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                         "TF not available for frame '%s': %s",
+                         msg->header.frame_id.c_str(), ex.what());
+    return;
+  }
+
+  sensor_msgs::msg::PointCloud2 cloud_transformed;
+  tf2::doTransform(*msg, cloud_transformed, transform);
+  assembler_->add_cloud(cloud_transformed);
 }
 
 void PointcloudAssemblerNode::publish_timer_callback() {

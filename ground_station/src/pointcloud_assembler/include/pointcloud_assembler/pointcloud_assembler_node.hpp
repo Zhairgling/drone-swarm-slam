@@ -6,6 +6,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 
 #include "pointcloud_assembler/pointcloud_assembler.hpp"
 
@@ -19,8 +21,8 @@ namespace pointcloud_assembler {
 ///   window_duration_sec (double) — time window for accumulation (default: 1.0)
 ///   max_clouds        (int)   — max clouds in buffer (default: 100)
 ///   publish_rate_hz   (double) — assembled cloud publish rate (default: 10.0)
-///   output_frame      (string) — frame_id for the assembled cloud
-///                                (default: "odom")
+///   output_frame      (string) — target TF frame for assembled cloud
+///                                (default: "map")
 class PointcloudAssemblerNode : public rclcpp::Node {
  public:
   explicit PointcloudAssemblerNode(
@@ -36,6 +38,8 @@ class PointcloudAssemblerNode : public rclcpp::Node {
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr publisher_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
   std::string output_frame_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };
 
 }  // namespace pointcloud_assembler

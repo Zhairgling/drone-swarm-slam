@@ -1,7 +1,9 @@
 """Launch file for the drone-swarm-slam ground station.
 
 Starts all ground station nodes:
-  - PointcloudAssembler  (ToF scans → merged PointCloud2)
+  - TfBroadcaster        (base_link → tof_*/camera static transforms, from #53)
+  - PoseExtractor        (MAVLink EKF → map → base_link TF, from #52)
+  - PointcloudAssembler  (ToF scans → merged PointCloud2 in map frame)
   - SlamNode             (PointCloud2 → OccupancyGrid / 3D map)
   - PoseEstimator        (map + drone pose → MAVLink corrections)
   - MissionController    (waypoint sequencing)
@@ -36,6 +38,34 @@ def generate_launch_description():
         num_drones_arg,
         drone_id_arg,
 
+        # TF broadcaster: publishes static drone_1/base_link → drone_1/tof_*
+        # and drone_1/camera transforms. Must start before pose_extractor so
+        # the full TF tree (map → base_link → sensors) is available early.
+        # Provided by issue #53.
+        Node(
+            package='drone_swarm_tf_broadcaster',
+            executable='tf_broadcaster_node',
+            name='tf_broadcaster',
+            output='screen',
+            parameters=[{
+                'drone_id': drone_id,
+            }],
+        ),
+
+        # Pose extractor: subscribes to MAVLink EKF data and publishes
+        # map → drone_N/base_link TF. Requires tf_broadcaster to be running
+        # so the downstream TF tree is complete.
+        # Provided by issue #52.
+        Node(
+            package='drone_swarm_pose_extractor',
+            executable='pose_extractor_node',
+            name='pose_extractor',
+            output='screen',
+            parameters=[{
+                'drone_id': drone_id,
+            }],
+        ),
+
         Node(
             package='drone_swarm_pointcloud_assembler',
             executable='pointcloud_assembler_node',
@@ -46,7 +76,7 @@ def generate_launch_description():
                 'window_duration_sec': 1.0,
                 'max_clouds': 100,
                 'publish_rate_hz': 10.0,
-                'output_frame': 'odom',
+                'output_frame': 'map',
             }],
         ),
 

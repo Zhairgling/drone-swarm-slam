@@ -4,6 +4,10 @@
 #include <functional>
 #include <string>
 
+#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <tf2/exceptions.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.hpp>
+
 namespace slam_node {
 
 SlamNode::SlamNode(const rclcpp::NodeOptions& options)
@@ -26,6 +30,9 @@ SlamNode::SlamNode(const rclcpp::NodeOptions& options)
   config.height_min = get_parameter("map_height_min").as_double();
   config.height_max = get_parameter("map_height_max").as_double();
   map_ = std::make_unique<OccupancyMap>(config);
+
+  tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // DESIGN: best_effort QoS matches the real micro-ROS sensor publishers
   // (see CLAUDE.md QoS section). Drone pointclouds are sensor data.
@@ -69,7 +76,29 @@ SlamNode::SlamNode(const rclcpp::NodeOptions& options)
 
 void SlamNode::pointcloud_callback(
     const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-  map_->add_pointcloud(*msg);
+  if (msg->header.frame_id == map_frame_) {
+    map_->add_pointcloud(*msg);
+    return;
+  }
+
+  geometry_msgs::msg::TransformStamped transform;
+  try {
+    // DESIGN: 100ms timeout matches the 15Hz sensor rate (66ms period).
+    // Clouds arriving before TF is available are skipped, not accumulated
+    // in the wrong frame.
+    transform = tf_buffer_->lookupTransform(
+        map_frame_, msg->header.frame_id, msg->header.stamp,
+        rclcpp::Duration::from_nanoseconds(100000000LL));
+  } catch (const tf2::TransformException& ex) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000,
+                         "TF not available for frame '%s': %s",
+                         msg->header.frame_id.c_str(), ex.what());
+    return;
+  }
+
+  sensor_msgs::msg::PointCloud2 cloud_map;
+  tf2::doTransform(*msg, cloud_map, transform);
+  map_->add_pointcloud(cloud_map);
 }
 
 void SlamNode::publish_map() {

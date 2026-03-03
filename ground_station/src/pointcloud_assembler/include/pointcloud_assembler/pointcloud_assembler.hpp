@@ -21,10 +21,9 @@ struct AssemblerConfig {
 /// with no ROS dependencies except the message type.
 ///
 /// DESIGN: This is a simple time-windowed accumulator. It does not perform
-/// any coordinate-frame transforms — callers are responsible for ensuring
-/// all incoming clouds are expressed in the same frame before adding them,
-/// or accepting that the assembled cloud mixes frames (acceptable for the
-/// initial SLAM bootstrap stage before TF2 integration).
+/// coordinate-frame transforms — callers (i.e. PointcloudAssemblerNode) are
+/// responsible for transforming all clouds to a common frame via TF2 before
+/// calling add_cloud().
 class PointcloudAssembler {
  public:
   explicit PointcloudAssembler(const AssemblerConfig& config);
