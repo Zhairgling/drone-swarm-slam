@@ -40,6 +40,10 @@ macOS Ground Station (ROS 2 Humble, C++)
 - `shared_ptr`/`unique_ptr` only, no raw new/delete
 - Tests: GTest via `ament_cmake_gtest`, every public method tested
 - Lint: `clang-tidy` + `cppcheck`
+- **cppcheck workaround**: Structs populated via `memcpy` from raw MAVLink
+  payloads trigger false `unusedStructMember` warnings. Add
+  `// cppcheck-suppress-file unusedStructMember` at the **top of the header**
+  (before `#pragma once`) for any file containing such structs.
 
 ### C (firmware/ — ESP-IDF)
 - C11, ESP-IDF conventions
