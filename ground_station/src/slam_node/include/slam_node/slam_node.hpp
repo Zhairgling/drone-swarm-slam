@@ -28,7 +28,7 @@ class SlamNode : public rclcpp::Node {
   explicit SlamNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
 
  private:
-  void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+  void pointcloud_callback(const sensor_msgs::msg::PointCloud2& msg);
   void publish_map();
 
   std::unique_ptr<OccupancyMap> map_;

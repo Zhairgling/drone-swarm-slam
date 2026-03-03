@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>drone_swarm_mavlink_pose_extractor</name>
+  <version>0.1.0</version>
+  <description>
+    Extracts drone pose from raw MAVLink frames and publishes
+    /drone_N/pose/estimated as geometry_msgs/PoseStamped (ENU frame)
+    plus TF map → drone_N/base_link. Subscribes to
+    /drone_N/mavlink/from_fc (std_msgs/UInt8MultiArray) and parses
+    LOCAL_POSITION_NED (msgid=32) and ATTITUDE (msgid=30).
+  </description>
+  <maintainer email="maintainer@todo.todo">Maintainer</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>geometry_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2_ros</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

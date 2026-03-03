@@ -33,8 +33,9 @@ PoseEstimatorNode::PoseEstimatorNode(const rclcpp::NodeOptions& options)
 
   sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       sub_topic, sub_qos,
-      std::bind(&PoseEstimatorNode::pose_callback, this,
-                std::placeholders::_1));
+      [this](const geometry_msgs::msg::PoseStamped& msg) {
+        pose_callback(msg);
+      });
 
   pub_ = create_publisher<mavros_msgs::msg::Mavlink>(pub_topic, pub_qos);
 
@@ -44,9 +45,9 @@ PoseEstimatorNode::PoseEstimatorNode(const rclcpp::NodeOptions& options)
 }
 
 void PoseEstimatorNode::pose_callback(
-    geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+    const geometry_msgs::msg::PoseStamped& msg) {
   auto mavlink_msg =
-      encode_vision_position_estimate(*msg, seq_++, sysid_, compid_);
+      encode_vision_position_estimate(msg, seq_++, sysid_, compid_);
   pub_->publish(mavlink_msg);
 }
 
