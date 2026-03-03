@@ -64,6 +64,7 @@ install(DIRECTORY launch/
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
 
   ament_add_gtest(test_occupancy_map test/test_occupancy_map.cpp)
   target_link_libraries(test_occupancy_map occupancy_map)
@@ -74,6 +75,11 @@ if(BUILD_TESTING)
     nav_msgs
     sensor_msgs
     std_msgs
+  )
+
+  ament_add_pytest_test(test_slam_node_launch
+    test/test_slam_node_launch.py
+    TIMEOUT 60
   )
 endif()
 

@@ -55,8 +55,8 @@ drones:
           protocol: "MAVLink (MTF-02P optical flow + lidar)"
           baud: 115200
           wiring:
-            fc_tx: TX7
-            fc_rx: RX7
+            fc_tx: TX7   # → MTF-02P RX (cross TX↔RX)
+            fc_rx: RX7   # ← MTF-02P TX (cross TX↔RX)
           ardupilot_params:
             SERIAL1_PROTOCOL: 1   # MAVLink
             FLOW_TYPE: 6          # MAVLink optical flow
@@ -75,8 +75,8 @@ drones:
           protocol: "GPS (NMEA / UBX)"
           baud: 115200
           wiring:
-            fc_tx: TX1
-            fc_rx: RX1
+            fc_tx: TX1   # → GPS RX (cross TX↔RX)
+            fc_rx: RX1   # ← GPS TX (cross TX↔RX)
           ardupilot_params:
             GPS1_TYPE: 1     # Auto
             COMPASS_USE: 1
@@ -105,8 +105,8 @@ drones:
           protocol: "MAVLink 2 (companion computer)"
           baud: 921600
           wiring:
-            fc_tx: TX4  # MCU pin PB9
-            fc_rx: RX4  # MCU pin PB8
+            fc_tx: TX4  # MCU pin PB9 → XIAO RX (GPIO20) (cross TX↔RX)
+            fc_rx: RX4  # MCU pin PB8 ← XIAO TX (GPIO21) (cross TX↔RX)
           ardupilot_params:
             SERIAL6_PROTOCOL: 2   # MAVLink2
             SERIAL6_BAUD: 921     # 921600
@@ -116,8 +116,8 @@ drones:
           protocol: "CRSF (ELRS RC)"
           baud: 420000
           wiring:
-            fc_rx: RX6   # CH1 — RC input from ELRS receiver
-            fc_tx: TX6   # CH2 — telemetry/commands to receiver (bidirectional CRSF)
+            fc_rx: RX6   # CH1 ← ELRS TX (cross TX↔RX)
+            fc_tx: TX6   # CH2 → ELRS RX (cross TX↔RX, telemetry passthrough)
           ardupilot_params:
             SERIAL7_PROTOCOL: 23  # RCIN
             BRD_ALT_CONFIG: 1     # Switches USART6 from RC-only to true UART for CRSF
@@ -277,6 +277,11 @@ drones:
         MAVLink UART. Provides altitude hold and indoor position hold capability.
         Mount facing straight down, aligned with drone X-axis (forward).
 
+    # -----------------------------------------------------------------------
+    # UART WIRING RULE: Always cross TX↔RX between devices.
+    #   FC TX → peripheral RX
+    #   FC RX ← peripheral TX
+    # I2C does NOT cross: SDA→SDA, SCL→SCL.
     # -----------------------------------------------------------------------
     # Optimal wiring summary — H743-MINI V3 serial port allocation
     # Source: ArduPilot hwdef.dat SERIAL_ORDER for this board.
