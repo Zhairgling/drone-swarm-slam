@@ -1,0 +1,3 @@
+# Ignore all rosbag recordings — these are large binary files.
+*
+!.gitignore
